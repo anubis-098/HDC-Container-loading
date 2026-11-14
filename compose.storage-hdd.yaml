@@ -1,0 +1,24 @@
+# Production HDD layout. Compose replaces mounts with the same container target.
+# Keep Docker Desktop's disk image on C: for application images and app-data.
+services:
+  api:
+    volumes:
+      - type: bind
+        source: D:/HDC-Data/HDC-Contrainer-Loading-data/archives
+        target: /archives
+        bind:
+          create_host_path: false
+  archive-worker:
+    volumes:
+      - type: bind
+        source: D:/HDC-Data/HDC-Contrainer-Loading-data/archives
+        target: /archives
+        bind:
+          create_host_path: false
+  postgres-images:
+    volumes:
+      - type: bind
+        source: D:/HDC-Data/HDC-Contrainer-Loading-data/postgres-images
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false

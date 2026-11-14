@@ -1,0 +1,78 @@
+services:
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+  api:
+    build: ./backend
+    restart: unless-stopped
+    environment: &api-environment
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD}
+      IMAGE_DB_PASSWORD: ${IMAGE_DB_PASSWORD:?Set IMAGE_DB_PASSWORD}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      ARCHIVE_DIRECTORY: /archives
+      ARCHIVE_ENABLED: ${ARCHIVE_ENABLED:-false}
+      PHOTO_RETENTION_DAYS: ${PHOTO_RETENTION_DAYS:-30}
+    volumes:
+      - ${ARCHIVE_PATH:-archive-data}:/archives
+    depends_on:
+      postgres-app:
+        condition: service_healthy
+      postgres-images:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/ready', timeout=5)",
+        ]
+      interval: 15s
+      timeout: 8s
+      start_period: 30s
+      retries: 5
+  archive-worker:
+    build: ./backend
+    restart: unless-stopped
+    command: ["python", "-m", "app.workers.scheduler"]
+    environment: *api-environment
+    volumes:
+      - ${ARCHIVE_PATH:-archive-data}:/archives
+    depends_on:
+      api:
+        condition: service_healthy
+  postgres-app:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: loading_app
+      POSTGRES_USER: loading
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD}
+    volumes:
+      - app-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loading -d loading_app"]
+      interval: 5s
+      retries: 10
+  postgres-images:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: loading_images
+      POSTGRES_USER: images
+      POSTGRES_PASSWORD: ${IMAGE_DB_PASSWORD:?Set IMAGE_DB_PASSWORD}
+    volumes:
+      - ${IMAGE_DATA_PATH:-image-data}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U images -d loading_images"]
+      interval: 5s
+      retries: 10
+volumes:
+  app-data:
+  image-data:
+  archive-data:

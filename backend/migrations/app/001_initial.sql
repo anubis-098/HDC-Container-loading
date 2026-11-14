@@ -1,0 +1,12 @@
+CREATE TABLE workers (id uuid PRIMARY KEY, name varchar(160) NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE admins (id uuid PRIMARY KEY, username varchar(60) UNIQUE NOT NULL, password_hash text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE sessions (token_hash char(64) PRIMARY KEY, actor_id uuid NOT NULL, role varchar(10) NOT NULL CHECK(role IN ('worker','admin')), expires_at timestamptz NOT NULL);
+CREATE INDEX sessions_expiry ON sessions(expires_at);
+CREATE TABLE stores (code varchar(40) PRIMARY KEY, name varchar(160) NOT NULL, active boolean NOT NULL DEFAULT true);
+CREATE TABLE trips (id uuid PRIMARY KEY, worker_id uuid NOT NULL REFERENCES workers(id), truck_id varchar(40) NOT NULL, truck_type varchar(60) NOT NULL, status varchar(10) NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN','DONE')), created_at timestamptz NOT NULL DEFAULT now(), completed_at timestamptz);
+CREATE INDEX trips_worker ON trips(worker_id, created_at DESC);
+CREATE TABLE shipments (id uuid PRIMARY KEY, trip_id uuid NOT NULL REFERENCES trips(id), number varchar(80) UNIQUE NOT NULL, store_code varchar(40) NOT NULL REFERENCES stores(code), store_name varchar(160) NOT NULL);
+CREATE TABLE pallets (id uuid PRIMARY KEY, shipment_id uuid NOT NULL REFERENCES shipments(id), number integer NOT NULL CHECK(number>0), UNIQUE(shipment_id, number));
+CREATE TABLE photos (id uuid PRIMARY KEY, pallet_id uuid NOT NULL REFERENCES pallets(id), side varchar(8) NOT NULL CHECK(side IN ('front','back','left','right')), sha256 char(64) NOT NULL, byte_size integer NOT NULL, uploaded_at timestamptz NOT NULL DEFAULT now(), archived_at timestamptz, archive_file text, UNIQUE(pallet_id,side));
+CREATE TABLE audit_log (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, actor_id uuid, event varchar(80) NOT NULL, target_id uuid, created_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX photos_expiry ON photos(uploaded_at);

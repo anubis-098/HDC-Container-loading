@@ -1,0 +1,38 @@
+services:
+  tests:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.test
+    environment:
+      APP_DATABASE_URL: postgresql://test:test@business-test:5432/loading_app_test
+      IMAGE_DATABASE_URL: postgresql://test:test@images-test:5432/loading_images_test
+      ARCHIVE_DIRECTORY: /tmp/test-archives
+    depends_on:
+      business-test:
+        condition: service_healthy
+      images-test:
+        condition: service_healthy
+  business-test:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: loading_app_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d loading_app_test"]
+      interval: 2s
+      retries: 20
+  images-test:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: loading_images_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d loading_images_test"]
+      interval: 2s
+      retries: 20
