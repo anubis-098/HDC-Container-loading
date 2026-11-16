@@ -91,3 +91,15 @@ def download_pdf(trip_id: UUID, who=Depends(admin)):
         finally:
             output.close()
     return StreamingResponse(chunks(),media_type='application/pdf',headers={'Content-Disposition':f'attachment; filename="trip-{trip_id}.pdf"','Content-Length':str(size),'Cache-Control':'no-store'},background=BackgroundTask(output.close))
+
+@router.delete('/{trip_id}')
+def delete_trip(trip_id: UUID, who=Depends(admin)):
+    with connect() as conn:
+        trip_access(conn, trip_id, who)
+        conn.execute('SELECT id FROM trips WHERE id=%s FOR UPDATE', (trip_id,))
+        conn.execute('DELETE FROM photos WHERE trip_id=%s OR pallet_id IN (SELECT p.id FROM pallets p JOIN shipments s ON s.id=p.shipment_id WHERE s.trip_id=%s)', (trip_id,trip_id))
+        conn.execute('DELETE FROM pallets WHERE shipment_id IN (SELECT id FROM shipments WHERE trip_id=%s)', (trip_id,))
+        conn.execute('DELETE FROM shipments WHERE trip_id=%s', (trip_id,))
+        conn.execute('DELETE FROM trips WHERE id=%s', (trip_id,))
+        conn.execute("INSERT INTO audit_log(actor_id,event,target_id) VALUES (%s,'DELETE_TRIP',%s)", (who['id'],trip_id))
+    return {'ok': True}

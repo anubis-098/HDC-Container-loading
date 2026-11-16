@@ -14,6 +14,8 @@ type Summary = {
 };
 export function DashboardPage() {
   useLanguage();
+  const [selected, setSelected] = useState<string[]>([]);
+  const [actionBusy, setActionBusy] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [search, setSearch] = useState("");
@@ -35,6 +37,7 @@ export function DashboardPage() {
       .then(([data, stats]) => {
         if (active) {
           setRows(data);
+          setSelected([]);
           setSummary(stats);
         }
       })
@@ -66,7 +69,7 @@ export function DashboardPage() {
         "Photos",
         t("เวลาสร้าง"),
       ],
-      ...rows.map((row) => [
+      ...rows.filter(row => !selected.length || selected.includes(row.id)).map((row) => [
         row.truck_id,
         row.truck_province,
         row.truck_type,
@@ -92,6 +95,16 @@ export function DashboardPage() {
   return (
     <section>
       <h1>Dashboard</h1>
+      <div className="table-tools">
+        <Button disabled={!selected.length || actionBusy} onClick={exportCsv}>{t("ดาวน์โหลดที่เลือก")} ({selected.length}) CSV</Button>
+        <Button disabled={!selected.length || actionBusy} onClick={async () => {
+          if (!window.confirm(t("ยืนยันลบรายการที่เลือกและภาพทั้งหมด?"))) return;
+          setActionBusy(true);
+          try { for (const id of selected) { await api(`/admin/trips/${id}`, {method:"DELETE"}); setSelected(values => values.filter(value => value !== id)); } }
+          catch (error) { setError(message(error)); }
+          finally { setActionBusy(false); setReload(value => value + 1); }
+        }}>{t("ลบที่เลือก")}</Button>
+      </div>
       <p>{t("ภาพรวมการโหลดสินค้าและภาพรวมของแต่ละเที่ยวรถ")}</p>
       {summary && (
         <div className="stats-grid">
@@ -159,7 +172,7 @@ export function DashboardPage() {
           <div className="table-scroll">
             <table>
               <thead>
-                <tr>
+                <tr><th><input type="checkbox" aria-label={t("เลือกทั้งหมดในหน้านี้")} disabled={actionBusy || !rows.length} checked={rows.length > 0 && selected.length === rows.length} onChange={e => setSelected(e.target.checked ? rows.map(row => row.id) : [])} /></th>
                   <th>{t("ทะเบียนรถ")}</th>
                   <th>{t("ผู้บันทึก")}</th>
                   <th>Shipment</th>
@@ -170,7 +183,7 @@ export function DashboardPage() {
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id}>
+                  <tr key={row.id}><td><input type="checkbox" aria-label={row.truck_id} disabled={actionBusy} checked={selected.includes(row.id)} onChange={e => setSelected(values => e.target.checked ? [...values,row.id] : values.filter(id => id !== row.id))} /></td>
                     <td>
                       <Link className="text-link" to={`/admin/trips/${row.id}`}>
                         {row.truck_id} {row.truck_province}
