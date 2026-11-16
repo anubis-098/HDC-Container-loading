@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from time import monotonic
 from threading import Lock
 from uuid import UUID, uuid4
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File
+from fastapi import Form, APIRouter, Depends, HTTPException, Request, Response, UploadFile, File
 from psycopg.errors import UniqueViolation
 from app.api.schemas import WorkerInput, LoginInput, TripInput, ShipmentInput, PalletInput, StoreInput
 from app.core.security import worker, admin, actor, create_session, password_matches, password_hash, trip_access
@@ -343,3 +343,18 @@ def upload_trip_photo(trip_id: UUID, photo_id: UUID, file: UploadFile = File(...
         if not previous:
             audit(conn, who, 'photo.upload', photo_id)
     return {'id':photo_id}
+
+@router.post('/admin/stores/import')
+async def import_stores(file: UploadFile = File(...), sheet: str = Form(''), who=Depends(admin)):
+    from app.services.store_import import parse_stores
+    if not (file.filename or '').lower().endswith('.xlsx'):
+        raise HTTPException(422, 'Please upload an XLSX file')
+    data = await file.read(5_000_001)
+    await file.close()
+    if len(data)>5_000_000:
+        raise HTTPException(413, 'Maximum file size is 5 MB')
+    records = parse_stores(data, sheet.strip())
+    with connect() as conn:
+        for code,name in records.items():
+            conn.execute('INSERT INTO stores(code,name,active) VALUES (%s,%s,true) ON CONFLICT(code) DO UPDATE SET name=excluded.name', (code,name))
+    return {'imported': len(records)}

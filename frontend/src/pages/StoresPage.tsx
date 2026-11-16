@@ -1,3 +1,4 @@
+import { StoreImport } from "../components/StoreImport";
 import { t, useLanguage, locale } from "../lib/i18n";
 import { useEffect, useState } from "react";
 import { api, message, type Store } from "../lib/api";
@@ -45,6 +46,7 @@ export function StoresPage() {
           {t(error)}
         </div>
       )}
+      <StoreImport onImported={load} />
       <form
         className="panel table-tools"
         onSubmit={(event) => {
