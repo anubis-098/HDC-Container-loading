@@ -1,3 +1,4 @@
+import { t, useLanguage, locale } from "../../lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -36,6 +37,7 @@ import {
   type PendingPhoto,
 } from "../../lib/photoQueue";
 export function LoadingPage() {
+  useLanguage();
   const navigate = useNavigate();
   const [who, setWho] = useState<Identity | null>(null);
   const [stores, setStores] = useState<Store[]>([]);
@@ -173,7 +175,7 @@ export function LoadingPage() {
       province.trim() &&
       !provinces.some((item) => item.name === province.trim())
     )
-      throw new Error("กรุณาเลือกจังหวัดป้ายทะเบียนจากรายการ");
+      throw new Error(t("กรุณาเลือกจังหวัดป้ายทะเบียนจากรายการ"));
     remember("trip-request:" + who?.id, tripRequest.current);
     const created = await api<Trip>("/trips", {
       method: "POST",
@@ -220,7 +222,7 @@ export function LoadingPage() {
           !trip.photos.some((photo) => photo.id === item.photoId),
       ).length;
       if (trip.photos.length + alreadyQueued + files.length > MAX_TRIP_PHOTOS)
-        throw new Error("รวมภาพที่รอส่งแล้ว ต้องไม่เกิน 120 ภาพต่อ Trip");
+        throw new Error(t("รวมภาพที่รอส่งแล้ว ต้องไม่เกิน 120 ภาพต่อ Trip"));
       for (const file of files) {
         await enqueue(trip.id, await compress(file));
         if (mounted.current) setQueue(await allPending());
@@ -265,18 +267,20 @@ export function LoadingPage() {
   if (loadFailed)
     return (
       <div className="panel client-form">
-        <h2>ยังโหลดข้อมูลเริ่มต้นไม่ครบ</h2>
+        <h2>{t("ยังโหลดข้อมูลเริ่มต้นไม่ครบ")}</h2>
         <p role="alert" className="error-box">
-          {error}
+          {t(error)}
         </p>
-        <p>ตรวจการเชื่อมต่อแล้วลองใหม่ ภาพรอส่งยังเก็บอยู่ในเครื่อง</p>
-        <Button onClick={() => window.location.reload()}>ลองโหลดใหม่</Button>
+        <p>{t("ตรวจการเชื่อมต่อแล้วลองใหม่ ภาพรอส่งยังเก็บอยู่ในเครื่อง")}</p>
+        <Button onClick={() => window.location.reload()}>
+          {t("ลองโหลดใหม่")}
+        </Button>
       </div>
     );
   if (!ready)
     return (
       <div className="worker-login" role="status">
-        กำลังโหลดงาน…
+        {t("กำลังโหลดงาน…")}
       </div>
     );
   return (
@@ -286,39 +290,43 @@ export function LoadingPage() {
           <div className="worker-avatar">{who?.name.slice(0, 1)}</div>
           <div className="worker-name">
             <b>{who?.name}</b>
-            <small>ผู้ปฏิบัติงาน · โหลดสินค้า</small>
+            <small>{t("ผู้ปฏิบัติงาน · โหลดสินค้า")}</small>
           </div>
         </div>
-        <div className="work-steps" aria-label="ความคืบหน้าของเที่ยวรถ">
+        <div className="work-steps" aria-label={t("ความคืบหน้าของเที่ยวรถ")}>
           <span
             className={!trip ? "current" : "complete"}
             aria-current={!trip ? "step" : undefined}
           >
-            <b>1</b> ข้อมูลรถ
+            <b>1</b>
+            {t("ข้อมูลรถ")}
           </span>
           <span
             className={trip && !done ? "current" : done ? "complete" : ""}
             aria-current={trip && !done ? "step" : undefined}
           >
-            <b>2</b> ภาพเที่ยวรถ
+            <b>2</b>
+            {t("ภาพเที่ยวรถ")}
           </span>
           <span
             className={done ? "current" : ""}
             aria-current={done ? "step" : undefined}
           >
-            <b>3</b> ปิดเที่ยวรถ
+            <b>3</b>
+            {t("ปิดเที่ยวรถ")}
           </span>
         </div>
       </div>
       <div className="work-body">
         {!online && (
           <div className="notice">
-            <WifiOff size={18} /> ออฟไลน์ · ภาพที่ถ่ายจะเก็บรอส่งในเครื่อง
+            <WifiOff size={18} />
+            {t("ออฟไลน์ · ภาพที่ถ่ายจะเก็บรอส่งในเครื่อง")}
           </div>
         )}
         {error && (
           <div className="error-box" role="alert">
-            {error}
+            {t(error)}
           </div>
         )}
         {jobs.some(
@@ -326,7 +334,7 @@ export function LoadingPage() {
         ) && (
           <details className="panel pending-jobs">
             <summary>
-              งานค้างของคุณ (
+              {t("งานค้างของคุณ (")}
               {
                 jobs.filter(
                   (item) => item.status === "OPEN" && item.id !== trip?.id,
@@ -353,10 +361,10 @@ export function LoadingPage() {
                   <span>
                     {item.truck_id}
                     <small>
-                      {new Date(item.created_at).toLocaleString("th-TH")}
+                      {new Date(item.created_at).toLocaleString(locale())}
                     </small>
                   </span>
-                  <span>ทำต่อ →</span>
+                  <span>{t("ทำต่อ →")}</span>
                 </button>
               ))}
           </details>
@@ -370,11 +378,13 @@ export function LoadingPage() {
             }}
           >
             <h2 className="section-heading">
-              <span>1</span>ข้อมูลรถ
+              <span>1</span>
+              {t("ข้อมูลรถ")}
             </h2>
             <p className="client-hint">
-              กรอกช่องสีเหลือง เลือกชนิดรถและ Store แล้วเริ่มถ่ายภาพ ·
-              จังหวัดไม่บังคับกรอก
+              {t(
+                "กรอกช่องสีเหลือง เลือกชนิดรถและ Store แล้วเริ่มถ่ายภาพ · จังหวัดไม่บังคับกรอก",
+              )}
             </p>
             <div className="registration-row">
               <div className="registration-number-field">
@@ -382,7 +392,7 @@ export function LoadingPage() {
                   className="plate-field-label"
                   htmlFor="truck-registration"
                 >
-                  ป้ายทะเบียนรถ
+                  {t("ป้ายทะเบียนรถ")}
                 </label>
                 <input
                   id="truck-registration"
@@ -405,7 +415,7 @@ export function LoadingPage() {
                     setTruck(event.target.value);
                     remember("truck-draft", event.target.value);
                   }}
-                  placeholder="เช่น 63-3512"
+                  placeholder={t("เช่น 63-3512")}
                 />
               </div>
               <ProvinceField
@@ -426,7 +436,7 @@ export function LoadingPage() {
               }}
             />
             <label>
-              ชนิดรถ
+              {t("ชนิดรถ")}
               <select
                 required
                 value={truckType}
@@ -436,16 +446,16 @@ export function LoadingPage() {
                   remember("truck-type-draft", event.target.value);
                 }}
               >
-                <option value="">เลือกชนิดรถ</option>
+                <option value="">{t("เลือกชนิดรถ")}</option>
                 {truckTypes.map((type) => (
                   <option key={type} value={type}>
-                    {type}
+                    {t(type)}
                   </option>
                 ))}
               </select>
             </label>
             <label>
-              ส่งไป Store
+              {t("ส่งไป Store")}
               <select
                 required
                 value={store}
@@ -454,7 +464,7 @@ export function LoadingPage() {
                   shipmentRequest.current = uid();
                 }}
               >
-                <option value="">เลือก Store ปลายทาง</option>
+                <option value="">{t("เลือก Store ปลายทาง")}</option>
                 {stores.map((item) => (
                   <option key={item.code} value={item.code}>
                     {item.code} · {item.name}
@@ -464,11 +474,11 @@ export function LoadingPage() {
             </label>
             {!stores.length && (
               <p className="error-box">
-                ยังไม่มี Store กรุณาให้ Admin เพิ่ม Store ก่อนเริ่มงาน
+                {t("ยังไม่มี Store กรุณาให้ Admin เพิ่ม Store ก่อนเริ่มงาน")}
               </p>
             )}
             <label>
-              เลข Shipment
+              {t("เลข Shipment")}
               <input
                 required
                 maxLength={80}
@@ -479,12 +489,12 @@ export function LoadingPage() {
                   setNumber(event.target.value);
                   shipmentRequest.current = uid();
                 }}
-                placeholder="สแกนหรือพิมพ์เลข Shipment"
+                placeholder={t("สแกนหรือพิมพ์เลข Shipment")}
               />
             </label>
-            <p className="client-hint">เลข Shipment ต้องไม่ซ้ำในระบบ</p>
+            <p className="client-hint">{t("เลข Shipment ต้องไม่ซ้ำในระบบ")}</p>
             <Button disabled={disabled || !online || !stores.length}>
-              {busy ? "กำลังบันทึก…" : "บันทึกข้อมูลและเริ่มถ่ายภาพ"}
+              {busy ? t("กำลังบันทึก…") : t("บันทึกข้อมูลและเริ่มถ่ายภาพ")}
             </Button>
           </form>
         ) : (
@@ -500,7 +510,7 @@ export function LoadingPage() {
                 </p>
               </div>
               <span className={`status-badge ${done ? "done" : ""}`}>
-                {done ? "ปิดงานแล้ว" : "กำลังโหลดสินค้า"}
+                {done ? t("ปิดงานแล้ว") : t("กำลังโหลดสินค้า")}
               </span>
             </div>
             {!done && trip.shipments.length === 0 && (
@@ -512,10 +522,11 @@ export function LoadingPage() {
                 }}
               >
                 <h2 className="section-heading">
-                  <span>1</span>เพิ่ม Shipment
+                  <span>1</span>
+                  {t("เพิ่ม Shipment")}
                 </h2>
                 <label>
-                  ส่งไป Store
+                  {t("ส่งไป Store")}
                   <select
                     required
                     value={store}
@@ -524,7 +535,7 @@ export function LoadingPage() {
                       shipmentRequest.current = uid();
                     }}
                   >
-                    <option value="">เลือก Store ปลายทาง</option>
+                    <option value="">{t("เลือก Store ปลายทาง")}</option>
                     {stores.map((item) => (
                       <option key={item.code} value={item.code}>
                         {item.code} · {item.name}
@@ -534,11 +545,13 @@ export function LoadingPage() {
                 </label>
                 {!stores.length && (
                   <p className="error-box">
-                    ยังไม่มี Store กรุณาให้ Admin เพิ่ม Store ก่อนเริ่มงาน
+                    {t(
+                      "ยังไม่มี Store กรุณาให้ Admin เพิ่ม Store ก่อนเริ่มงาน",
+                    )}
                   </p>
                 )}
                 <label>
-                  เลข Shipment
+                  {t("เลข Shipment")}
                   <input
                     required
                     maxLength={80}
@@ -549,12 +562,15 @@ export function LoadingPage() {
                       setNumber(event.target.value);
                       shipmentRequest.current = uid();
                     }}
-                    placeholder="สแกนหรือพิมพ์เลข Shipment"
+                    placeholder={t("สแกนหรือพิมพ์เลข Shipment")}
                   />
                 </label>
-                <p className="client-hint">เลข Shipment ต้องไม่ซ้ำในระบบ</p>
+                <p className="client-hint">
+                  {t("เลข Shipment ต้องไม่ซ้ำในระบบ")}
+                </p>
                 <Button disabled={disabled || !stores.length || !online}>
-                  <Plus size={18} /> เพิ่ม Shipment
+                  <Plus size={18} />
+                  {t("เพิ่ม Shipment")}
                 </Button>
               </form>
             )}
@@ -568,26 +584,28 @@ export function LoadingPage() {
             ))}
             <div className="panel">
               <h2 className="section-heading">
-                <span>2</span>ภาพสินค้าในเที่ยวรถ
+                <span>2</span>
+                {t("ภาพสินค้าในเที่ยวรถ")}
               </h2>
               <TripPhotoChart sent={photoCount} pending={queuedOnly.length} />
               {!done && (
                 <p className="client-hint">
-                  ถ่ายภาพให้เห็นสินค้าชัดเจน ระบบส่งภาพอัตโนมัติ
-                  เมื่อภาพส่งครบแล้วให้ตรวจสอบและปิดเที่ยวรถ
+                  {t(
+                    "ถ่ายภาพให้เห็นสินค้าชัดเจน ระบบส่งภาพอัตโนมัติ เมื่อภาพส่งครบแล้วให้ตรวจสอบและปิดเที่ยวรถ",
+                  )}
                 </p>
               )}
               {!done && (
                 <div className="trip-capture-actions">
                   <label className="camera-button">
                     <Camera size={24} />
-                    <span>ถ่ายภาพสินค้า</span>
+                    <span>{t("ถ่ายภาพสินค้า")}</span>
                     <input
                       disabled={disabled || totalPhotos >= MAX_TRIP_PHOTOS}
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
                       capture="environment"
-                      aria-label="ถ่ายภาพสินค้า"
+                      aria-label={t("ถ่ายภาพสินค้า")}
                       onChange={(event) => {
                         const files = Array.from(event.target.files || []);
                         event.target.value = "";
@@ -597,13 +615,13 @@ export function LoadingPage() {
                   </label>
                   <label className="camera-button gallery-button">
                     <Plus size={20} />
-                    <span>เลือกภาพจากเครื่อง</span>
+                    <span>{t("เลือกภาพจากเครื่อง")}</span>
                     <input
                       disabled={disabled || totalPhotos >= MAX_TRIP_PHOTOS}
                       type="file"
                       multiple
                       accept="image/jpeg,image/png,image/webp"
-                      aria-label="เลือกภาพจากเครื่อง"
+                      aria-label={t("เลือกภาพจากเครื่อง")}
                       onChange={(event) => {
                         const files = Array.from(event.target.files || []);
                         event.target.value = "";
@@ -617,7 +635,7 @@ export function LoadingPage() {
                 {trip.photos.map((photo, index) => (
                   <PhotoTile
                     key={photo.id}
-                    label={`ภาพที่ ${index + 1}`}
+                    label={t("ภาพที่ {0}", index + 1)}
                     photo={photo}
                     disabled
                     onCapture={() => {}}
@@ -626,7 +644,7 @@ export function LoadingPage() {
                 {queuedOnly.map((item, index) => (
                   <div key={item.key}>
                     <PhotoTile
-                      label={"รอส่ง " + (index + 1)}
+                      label={t("รอส่ง ") + (index + 1)}
                       pending={item}
                       disabled
                       onCapture={() => {}}
@@ -637,33 +655,35 @@ export function LoadingPage() {
                       className="full-width"
                       disabled={disabled}
                       onClick={() => {
-                        if (window.confirm("ลบภาพนี้ออกจากคิวรอส่งในเครื่อง?"))
+                        if (
+                          window.confirm(t("ลบภาพนี้ออกจากคิวรอส่งในเครื่อง?"))
+                        )
                           void action(async () => {
                             await acknowledge(item);
                             setQueue(await allPending());
                           });
                       }}
                     >
-                      ลบภาพรอส่ง
+                      {t("ลบภาพรอส่ง")}
                     </Button>
                   </div>
                 ))}
               </div>
               {totalPhotos >= MAX_TRIP_PHOTOS && (
                 <p className="notice">
-                  ครบ 120 ภาพแล้ว กรุณาส่งภาพที่ค้างและปิดเที่ยวรถ
+                  {t("ครบ 120 ภาพแล้ว กรุณาส่งภาพที่ค้างและปิดเที่ยวรถ")}
                 </p>
               )}
             </div>
             <div className="panel upload-summary">
               <h2 className="section-heading">
                 <span>3</span>
-                {done ? "บันทึกสำเร็จ" : "ตรวจสอบและส่งข้อมูล"}
+                {done ? t("บันทึกสำเร็จ") : t("ตรวจสอบและส่งข้อมูล")}
               </h2>
               {pending.length > 0 && (
                 <p>
-                  {pending.length} ภาพรอส่ง ·
-                  อย่าล้างข้อมูลเว็บไซต์จนกว่าจะส่งครบ
+                  {pending.length}
+                  {t("ภาพรอส่ง · อย่าล้างข้อมูลเว็บไซต์จนกว่าจะส่งครบ")}
                 </p>
               )}
               {!done && (
@@ -673,13 +693,15 @@ export function LoadingPage() {
                   onClick={() => void sync(trip.id)}
                 >
                   <RefreshCw size={17} />
-                  {syncing ? "กำลังส่งภาพ…" : "ตรวจสอบ / ส่งภาพที่ค้างใหม่"}
+                  {syncing
+                    ? t("กำลังส่งภาพ…")
+                    : t("ตรวจสอบ / ส่งภาพที่ค้างใหม่")}
                 </Button>
               )}
               {done && (
                 <p className="success-text">
                   <CheckCircle2 size={18} />{" "}
-                  ข้อมูลและภาพถูกบันทึกบนเซิร์ฟเวอร์แล้ว
+                  {t("ข้อมูลและภาพถูกบันทึกบนเซิร์ฟเวอร์แล้ว")}
                 </p>
               )}
             </div>
@@ -691,7 +713,7 @@ export function LoadingPage() {
                 photoCount={photoCount}
                 busy={disabled}
                 canConfirm={complete && online}
-                error={error}
+                error={t(error)}
                 onBack={() => setConfirmClose(false)}
                 onConfirm={() =>
                   void action(async () => {
@@ -709,7 +731,8 @@ export function LoadingPage() {
             <div className="work-footer">
               {done ? (
                 <Button className="full-width" onClick={newTrip}>
-                  <Plus size={18} /> เริ่ม Trip ถัดไป
+                  <Plus size={18} />
+                  {t("เริ่ม Trip ถัดไป")}
                 </Button>
               ) : (
                 <Button
@@ -718,13 +741,14 @@ export function LoadingPage() {
                   onClick={() => setConfirmClose(true)}
                 >
                   <Send size={18} />
-                  {syncing ? "กำลังส่งภาพ…" : "ตรวจสอบและปิดเที่ยวรถ"}
+                  {syncing ? t("กำลังส่งภาพ…") : t("ตรวจสอบและปิดเที่ยวรถ")}
                 </Button>
               )}
               {!complete && !done && (
                 <small>
-                  ต้องมี Shipment และส่งภาพอย่างน้อย 1 ภาพ
-                  พร้อมส่งคิวที่ค้างให้ครบ
+                  {t(
+                    "ต้องมี Shipment และส่งภาพอย่างน้อย 1 ภาพ พร้อมส่งคิวที่ค้างให้ครบ",
+                  )}
                 </small>
               )}
             </div>

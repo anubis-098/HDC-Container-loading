@@ -1,3 +1,4 @@
+import { t, useLanguage, locale } from "../lib/i18n";
 import { useState } from "react";
 import { Camera, LoaderCircle } from "lucide-react";
 import { api, message } from "../lib/api";
@@ -11,6 +12,7 @@ export function PlateReader({
   disabled: boolean;
   onSelect: (value: string) => void;
 }) {
+  useLanguage();
   const [cameraOpen, setCameraOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -29,7 +31,7 @@ export function PlateReader({
       if (plate) onSelect(plate);
       else
         setError(
-          "อ่านทะเบียนไม่สำเร็จ กรุณาถ่ายใหม่หรือพิมพ์ทะเบียนในช่องด้านบน",
+          t("อ่านทะเบียนไม่สำเร็จ กรุณาถ่ายใหม่หรือพิมพ์ทะเบียนในช่องด้านบน"),
         );
     } catch (error) {
       setError(message(error));
@@ -44,8 +46,8 @@ export function PlateReader({
         variant="outline"
         className="plate-scan-trigger camera-action-button"
         disabled={disabled || busy}
-        title="ถ่ายป้ายทะเบียนเพื่ออ่านตัวอักษร"
-        aria-label="ถ่ายป้ายทะเบียนเพื่ออ่านตัวอักษร"
+        title={t("ถ่ายป้ายทะเบียนเพื่ออ่านตัวอักษร")}
+        aria-label={t("ถ่ายป้ายทะเบียนเพื่ออ่านตัวอักษร")}
         onClick={() => {
           setError("");
           setCameraOpen(true);
@@ -56,7 +58,7 @@ export function PlateReader({
         ) : (
           <Camera size={20} />
         )}
-        <span>{busy ? "กำลังอ่านทะเบียน…" : "สแกนป้ายทะเบียน"}</span>
+        <span>{busy ? t("กำลังอ่านทะเบียน…") : t("สแกนป้ายทะเบียน")}</span>
       </Button>
       {cameraOpen && (
         <PlateCamera
@@ -67,10 +69,10 @@ export function PlateReader({
           }}
         />
       )}
-      {busy && <p role="status">กำลังอ่านภาพ กรุณารอสักครู่</p>}
+      {busy && <p role="status">{t("กำลังอ่านภาพ กรุณารอสักครู่")}</p>}
       {error && (
         <p role="alert" className="error-box">
-          {error}
+          {t(error)}
         </p>
       )}
     </div>

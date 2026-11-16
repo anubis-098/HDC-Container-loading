@@ -1,3 +1,4 @@
+import { t, useLanguage, locale } from "../lib/i18n";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Download, FileText, ZoomIn } from "lucide-react";
@@ -5,6 +6,7 @@ import { api, message, type Trip, type Photo } from "../lib/api";
 import { Button } from "../components/ui/button";
 import { PhotoViewer, photoUrl } from "../components/PhotoViewer";
 export function TripDetailPage() {
+  useLanguage();
   const { tripId } = useParams();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [error, setError] = useState("");
@@ -37,7 +39,7 @@ export function TripDetailPage() {
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        throw new Error(body.detail || "ดาวน์โหลดไม่สำเร็จ กรุณาลองใหม่");
+        throw new Error(body.detail || t("ดาวน์โหลดไม่สำเร็จ กรุณาลองใหม่"));
       }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
@@ -62,13 +64,13 @@ export function TripDetailPage() {
   }
   return (
     <section>
-      <h1>รายละเอียดเที่ยวรถ</h1>
+      <h1>{t("รายละเอียดเที่ยวรถ")}</h1>
       {error && (
         <p className="error-box" role="alert">
-          {error}
+          {t(error)}
         </p>
       )}
-      {!trip && !error && <p>กำลังโหลด…</p>}
+      {!trip && !error && <p>{t("กำลังโหลด…")}</p>}
       {trip && (
         <>
           <div className="panel">
@@ -76,10 +78,11 @@ export function TripDetailPage() {
               {trip.truck_id} {trip.truck_province} · {trip.truck_type}
             </h2>
             <p>
-              ผู้บันทึก: {trip.worker_name} ·{" "}
-              {trip.status === "DONE" ? "ปิดงานแล้ว" : "งานค้าง"}
+              {t("ผู้บันทึก:")}
+              {trip.worker_name} ·{" "}
+              {trip.status === "DONE" ? t("ปิดงานแล้ว") : t("งานค้าง")}
             </p>
-            <p>{new Date(trip.created_at).toLocaleString("th-TH")}</p>
+            <p>{new Date(trip.created_at).toLocaleString(locale())}</p>
           </div>
           <div className="panel">
             <h2>Shipment / Store</h2>
@@ -91,7 +94,11 @@ export function TripDetailPage() {
           </div>
           <div className="panel">
             <div className="evidence-actions">
-              <h2>ภาพของ Trip · {trip.photos.length} ภาพ</h2>
+              <h2>
+                {t("ภาพของ Trip ·")}
+                {trip.photos.length}
+                {t("ภาพ")}
+              </h2>
               <Button
                 variant="outline"
                 disabled={!trip.photos.length || downloading}
@@ -102,7 +109,8 @@ export function TripDetailPage() {
                   )
                 }
               >
-                <Download size={17} /> ดาวน์โหลดทั้งหมด ZIP
+                <Download size={17} />
+                {t("ดาวน์โหลดทั้งหมด ZIP")}
               </Button>
               <Button
                 disabled={!trip.photos.length || downloading}
@@ -113,18 +121,19 @@ export function TripDetailPage() {
                   )
                 }
               >
-                <FileText size={17} /> รายงาน PDF
+                <FileText size={17} />
+                {t("รายงาน PDF")}
               </Button>
             </div>
             <p className="client-hint">
-              คลิกภาพเพื่อซูม · PDF แนวนอน A4 จัด 6 ภาพต่อหน้า
+              {t("คลิกภาพเพื่อซูม · PDF แนวนอน A4 จัด 6 ภาพต่อหน้า")}
             </p>
             {downloading && (
-              <p role="status">กำลังเตรียมไฟล์ กรุณารอสักครู่…</p>
+              <p role="status">{t("กำลังเตรียมไฟล์ กรุณารอสักครู่…")}</p>
             )}
             {downloadError && (
               <p className="error-box" role="alert">
-                {downloadError}
+                {t(downloadError)}
               </p>
             )}
             <div className="evidence-grid">
@@ -134,19 +143,21 @@ export function TripDetailPage() {
                     type="button"
                     className="evidence-thumbnail"
                     onClick={() => setSelected(index)}
-                    aria-label={`ดูและซูมภาพที่ ${index + 1}`}
+                    aria-label={t("ดูและซูมภาพที่ {0}", index + 1)}
                   >
                     <img
                       src={photoUrl(photo)}
-                      alt={`ภาพที่ ${index + 1}`}
+                      alt={t("ภาพที่ {0}", index + 1)}
                       loading="lazy"
                     />
                     <span>
-                      <ZoomIn size={18} /> ดูภาพ
+                      <ZoomIn size={18} />
+                      {t("ดูภาพ")}
                     </span>
                   </button>
                   <figcaption>
-                    ภาพที่ {index + 1}
+                    {t("ภาพที่")}
+                    {index + 1}
                     {photo.archived_at ? " · Archive" : ""}
                   </figcaption>
                   <Button
@@ -155,12 +166,13 @@ export function TripDetailPage() {
                     disabled={downloading}
                     onClick={() => single(photo, index)}
                   >
-                    <Download size={16} /> ดาวน์โหลด
+                    <Download size={16} />
+                    {t("ดาวน์โหลด")}
                   </Button>
                 </figure>
               ))}
             </div>
-            {!trip.photos.length && <p>ยังไม่มีภาพ</p>}
+            {!trip.photos.length && <p>{t("ยังไม่มีภาพ")}</p>}
           </div>
           {selected !== null && (
             <PhotoViewer
@@ -169,7 +181,7 @@ export function TripDetailPage() {
               onClose={() => setSelected(null)}
               onDownload={single}
               downloading={downloading}
-              downloadError={downloadError}
+              downloadError={t(downloadError)}
             />
           )}
         </>

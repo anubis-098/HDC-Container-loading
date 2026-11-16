@@ -1,7 +1,10 @@
-﻿import { useLocation, useNavigate } from "react-router-dom";
+import { t, useLanguage, locale } from "../lib/i18n";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Clock } from "./Clock";
+import { LanguageSwitch } from "../lib/i18n";
 export function SiteHeader() {
+  useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const home = location.pathname === "/";
@@ -21,8 +24,8 @@ export function SiteHeader() {
         type="button"
         className="site-header-back"
         disabled={home}
-        aria-label="ย้อนกลับไปหน้าก่อนหน้า"
-        title="ย้อนกลับ"
+        aria-label={t("ย้อนกลับไปหน้าก่อนหน้า")}
+        title={t("ย้อนกลับ")}
         onClick={back}
       >
         <ArrowLeft size={20} />
@@ -36,8 +39,9 @@ export function SiteHeader() {
       />
       <div className="site-header-title">
         <strong>Container Loading</strong>
-        <small>ระบบบันทึกการโหลดสินค้า</small>
+        <small>{t("ระบบบันทึกการโหลดสินค้า")}</small>
       </div>
+      <LanguageSwitch />
       <Clock />
     </header>
   );

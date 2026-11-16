@@ -1,3 +1,4 @@
+import { t, useLanguage, locale } from "../lib/i18n";
 import { useEffect, useRef } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "./ui/button";
@@ -19,6 +20,7 @@ export function CloseTripDialog({
   onBack: () => void;
   onConfirm: () => void;
 }) {
+  useLanguage();
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const element = dialog.current;
@@ -47,16 +49,17 @@ export function CloseTripDialog({
       <div className="close-trip-icon">
         <CheckCircle2 size={28} />
       </div>
-      <h2 id="close-trip-title">ยืนยันปิดเที่ยวรถ?</h2>
+      <h2 id="close-trip-title">{t("ยืนยันปิดเที่ยวรถ?")}</h2>
       <p className="close-trip-truck">
-        {truckId} · {photoCount} ภาพ
+        {truckId} · {photoCount}
+        {t("ภาพ")}
       </p>
       <p id="close-trip-description">
-        หลังปิดงานจะไม่สามารถเพิ่มภาพในเที่ยวรถนี้ได้
+        {t("หลังปิดงานจะไม่สามารถเพิ่มภาพในเที่ยวรถนี้ได้")}
       </p>
       {error && (
         <p className="error-box" role="alert">
-          {error}
+          {t(error)}
         </p>
       )}
       <div className="close-trip-actions">
@@ -67,14 +70,14 @@ export function CloseTripDialog({
           disabled={busy}
           onClick={onBack}
         >
-          กลับ
+          {t("กลับ")}
         </Button>
         <Button
           type="button"
           disabled={busy || !canConfirm}
           onClick={onConfirm}
         >
-          {busy ? "กำลังบันทึก…" : "ยืนยัน"}
+          {busy ? t("กำลังบันทึก…") : t("ยืนยัน")}
         </Button>
       </div>
     </dialog>

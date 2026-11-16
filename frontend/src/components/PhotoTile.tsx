@@ -1,3 +1,4 @@
+import { t, useLanguage, locale } from "../lib/i18n";
 import { useEffect, useState } from "react";
 import { Camera, CheckCircle2, CloudUpload } from "lucide-react";
 import type { Photo } from "../lib/api";
@@ -15,6 +16,7 @@ export function PhotoTile({
   disabled: boolean;
   onCapture: (file: File) => void;
 }) {
+  useLanguage();
   const [local, setLocal] = useState("");
   useEffect(() => {
     if (!pending) {
@@ -40,19 +42,20 @@ export function PhotoTile({
       <span>
         {pending ? (
           <>
-            <CloudUpload size={13} /> รอส่ง
+            <CloudUpload size={13} />
+            {t("รอส่ง")}
           </>
         ) : photo ? (
           <>
             <CheckCircle2 size={13} />{" "}
             {photo.archived_at
-              ? "Archive แล้ว"
+              ? t("Archive แล้ว")
               : disabled
-                ? "ส่งสำเร็จ"
-                : "ส่งแล้ว · ถ่ายใหม่"}
+                ? t("ส่งสำเร็จ")
+                : t("ส่งแล้ว · ถ่ายใหม่")}
           </>
         ) : (
-          "แตะเพื่อถ่ายภาพ"
+          t("แตะเพื่อถ่ายภาพ")
         )}
       </span>
       <input
@@ -60,7 +63,7 @@ export function PhotoTile({
         accept="image/jpeg,image/png,image/webp"
         capture="environment"
         disabled={disabled}
-        aria-label={`ถ่ายภาพ${label}`}
+        aria-label={t("ถ่ายภาพ{0}", label)}
         onChange={(event) => {
           const file = event.target.files?.[0];
           event.target.value = "";

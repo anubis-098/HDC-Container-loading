@@ -1,7 +1,9 @@
+import { t, useLanguage, locale } from "../lib/i18n";
 import { useEffect, useState } from "react";
 import { api, message, type Store } from "../lib/api";
 import { Button } from "../components/ui/button";
 export function StoresPage() {
+  useLanguage();
   const [stores, setStores] = useState<Store[]>([]);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -36,11 +38,11 @@ export function StoresPage() {
   }
   return (
     <section>
-      <h1>จัดการ Store</h1>
-      <p>เพิ่ม Store เพื่อให้พนักงานเลือกปลายทางได้</p>
+      <h1>{t("จัดการ Store")}</h1>
+      <p>{t("เพิ่ม Store เพื่อให้พนักงานเลือกปลายทางได้")}</p>
       {error && (
         <div className="error-box" role="alert">
-          {error}
+          {t(error)}
         </div>
       )}
       <form
@@ -51,7 +53,7 @@ export function StoresPage() {
         }}
       >
         <label>
-          รหัส Store
+          {t("รหัส Store")}
           <input
             required
             pattern="[A-Za-z0-9_-]+"
@@ -59,11 +61,11 @@ export function StoresPage() {
             value={code}
             disabled={busy || editingCode !== null}
             onChange={(event) => setCode(event.target.value)}
-            placeholder="เช่น 1001"
+            placeholder={t("เช่น 1001")}
           />
         </label>
         <label>
-          ชื่อ Store
+          {t("ชื่อ Store")}
           <input
             required
             maxLength={160}
@@ -73,7 +75,7 @@ export function StoresPage() {
           />
         </label>
         <Button disabled={busy}>
-          {editingCode ? "บันทึกการแก้ไข" : "เพิ่ม Store"}
+          {editingCode ? t("บันทึกการแก้ไข") : t("เพิ่ม Store")}
         </Button>
         {editingCode && (
           <Button
@@ -87,7 +89,7 @@ export function StoresPage() {
               setActive(true);
             }}
           >
-            ยกเลิกแก้ไข
+            {t("ยกเลิกแก้ไข")}
           </Button>
         )}
       </form>
@@ -95,10 +97,10 @@ export function StoresPage() {
         <table>
           <thead>
             <tr>
-              <th>รหัส</th>
-              <th>ชื่อ</th>
-              <th>สถานะ</th>
-              <th>จัดการ</th>
+              <th>{t("รหัส")}</th>
+              <th>{t("ชื่อ")}</th>
+              <th>{t("สถานะ")}</th>
+              <th>{t("จัดการ")}</th>
             </tr>
           </thead>
           <tbody>
@@ -106,7 +108,7 @@ export function StoresPage() {
               <tr key={item.code}>
                 <td>{item.code}</td>
                 <td>{item.name}</td>
-                <td>{item.active ? "เปิดใช้งาน" : "ปิดใช้งาน"}</td>
+                <td>{item.active ? t("เปิดใช้งาน") : t("ปิดใช้งาน")}</td>
                 <td>
                   <Button
                     variant="outline"
@@ -118,21 +120,21 @@ export function StoresPage() {
                       setActive(item.active);
                     }}
                   >
-                    แก้ไข
+                    {t("แก้ไข")}
                   </Button>{" "}
                   <Button
                     variant="outline"
                     disabled={busy}
                     onClick={() => void save({ ...item, active: !item.active })}
                   >
-                    {item.active ? "ปิดใช้งาน" : "เปิดใช้งาน"}
+                    {item.active ? t("ปิดใช้งาน") : t("เปิดใช้งาน")}
                   </Button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {!stores.length && <p className="empty-state">ยังไม่มี Store</p>}
+        {!stores.length && <p className="empty-state">{t("ยังไม่มี Store")}</p>}
       </div>
     </section>
   );

@@ -1,3 +1,4 @@
+import { t, useLanguage, locale } from "../lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import { Camera, X } from "lucide-react";
 import { Button } from "./ui/button";
@@ -9,6 +10,7 @@ export function PlateCamera({
   onClose: () => void;
   onCapture: (file: File) => void;
 }) {
+  useLanguage();
   const dialog = useRef<HTMLDialogElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const frame = useRef<HTMLDivElement>(null);
@@ -28,7 +30,7 @@ export function PlateCamera({
     async function start() {
       try {
         if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)
-          throw new Error("เปิดเว็บผ่าน HTTPS เพื่อใช้งานกล้อง");
+          throw new Error(t("เปิดเว็บผ่าน HTTPS เพื่อใช้งานกล้อง"));
         stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
           video: {
@@ -50,11 +52,13 @@ export function PlateCamera({
           setError(
             err instanceof DOMException
               ? err.name === "NotAllowedError"
-                ? "กรุณาอนุญาตการใช้กล้องใน Chrome แล้วลองใหม่"
-                : "เปิดกล้องไม่ได้ กรุณาตรวจสอบว่ามีกล้องพร้อมใช้งานและไม่ได้ถูกแอปอื่นใช้อยู่"
+                ? t("กรุณาอนุญาตการใช้กล้องใน Chrome แล้วลองใหม่")
+                : t(
+                    "เปิดกล้องไม่ได้ กรุณาตรวจสอบว่ามีกล้องพร้อมใช้งานและไม่ได้ถูกแอปอื่นใช้อยู่",
+                  )
               : err instanceof Error
                 ? err.message
-                : "เปิดกล้องไม่สำเร็จ",
+                : t("เปิดกล้องไม่สำเร็จ"),
           );
       }
     }
@@ -99,7 +103,7 @@ export function PlateCamera({
       canvas.height = Math.round(height);
       const context = canvas.getContext("2d");
       if (!context || !canvas.width || !canvas.height)
-        throw new Error("กล้องยังไม่พร้อม กรุณาลองใหม่");
+        throw new Error(t("กล้องยังไม่พร้อม กรุณาลองใหม่"));
       context.drawImage(
         source,
         x,
@@ -114,12 +118,12 @@ export function PlateCamera({
       const blob = await new Promise<Blob | null>((resolve) =>
         canvas.toBlob(resolve, "image/jpeg", 0.94),
       );
-      if (!blob) throw new Error("บันทึกภาพไม่สำเร็จ กรุณาถ่ายใหม่");
+      if (!blob) throw new Error(t("บันทึกภาพไม่สำเร็จ กรุณาถ่ายใหม่"));
       if (alive.current)
         onCapture(new File([blob], "plate.jpg", { type: "image/jpeg" }));
     } catch (err) {
       if (alive.current)
-        setError(err instanceof Error ? err.message : "ถ่ายภาพไม่สำเร็จ");
+        setError(err instanceof Error ? err.message : t("ถ่ายภาพไม่สำเร็จ"));
     } finally {
       captureLock.current = false;
       if (alive.current) setBusy(false);
@@ -136,18 +140,18 @@ export function PlateCamera({
       }}
     >
       <div className="plate-camera-heading">
-        <h2 id="plate-camera-title">สแกนป้ายทะเบียน</h2>
+        <h2 id="plate-camera-title">{t("สแกนป้ายทะเบียน")}</h2>
         <Button
           type="button"
           variant="outline"
           autoFocus
-          aria-label="ปิดกล้อง"
+          aria-label={t("ปิดกล้อง")}
           onClick={onClose}
         >
           <X size={20} />
         </Button>
       </div>
-      <p>จัดป้ายทะเบียนให้อยู่ในกรอบ แล้วกดถ่ายภาพ</p>
+      <p>{t("จัดป้ายทะเบียนให้อยู่ในกรอบ แล้วกดถ่ายภาพ")}</p>
       <div className="plate-camera-preview">
         <video
           ref={video}
@@ -157,24 +161,24 @@ export function PlateCamera({
           onLoadedData={() => setReady(true)}
           onError={() => {
             setReady(false);
-            setError("ภาพจากกล้องขัดข้อง กรุณาปิดแล้วเปิดใหม่");
+            setError(t("ภาพจากกล้องขัดข้อง กรุณาปิดแล้วเปิดใหม่"));
           }}
         />
         <div ref={frame} className="plate-camera-frame" aria-hidden="true" />
         {!ready && !error && (
           <span className="plate-camera-wait" role="status">
-            กำลังเปิดกล้อง…
+            {t("กำลังเปิดกล้อง…")}
           </span>
         )}
       </div>
       {error && (
         <p className="error-box" role="alert">
-          {error}
+          {t(error)}
         </p>
       )}
       <div className="plate-camera-actions">
         <Button type="button" variant="outline" onClick={onClose}>
-          กลับ
+          {t("กลับ")}
         </Button>
         <Button
           type="button"
@@ -183,7 +187,7 @@ export function PlateCamera({
           onClick={() => void capture()}
         >
           <Camera size={20} />
-          {busy ? "กำลังถ่าย…" : "ถ่ายภาพและอ่านทะเบียน"}
+          {busy ? t("กำลังถ่าย…") : t("ถ่ายภาพและอ่านทะเบียน")}
         </Button>
       </div>
     </dialog>

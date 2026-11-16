@@ -1,3 +1,4 @@
+import { t, useLanguage, locale } from "../lib/i18n";
 import { SiteHeader } from "../components/SiteHeader";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { api, ApiError, message, type Identity } from "../lib/api";
 export function AppLayout() {
+  useLanguage();
   const navigate = useNavigate();
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [error, setError] = useState("");
@@ -30,17 +32,17 @@ export function AppLayout() {
         {error ? (
           <>
             <p role="alert" className="error-box">
-              {error}
+              {t(error)}
             </p>
             <button
               className="back-button"
               onClick={() => window.location.reload()}
             >
-              ลองเชื่อมต่อใหม่
+              {t("ลองเชื่อมต่อใหม่")}
             </button>
           </>
         ) : (
-          "กำลังตรวจสอบสิทธิ์…"
+          t("กำลังตรวจสอบสิทธิ์…")
         )}
       </div>
     );
@@ -53,7 +55,7 @@ export function AppLayout() {
           className="logo"
         />
         <h2>Container Loading</h2>
-        <nav aria-label="เมนูหลัก">
+        <nav aria-label={t("เมนูหลัก")}>
           <NavLink to="/admin" end>
             <LayoutDashboard size={19} /> Dashboard
           </NavLink>
@@ -61,10 +63,12 @@ export function AppLayout() {
             <Store size={19} /> Store
           </NavLink>
           <NavLink to="/admin/settings">
-            <Settings size={19} /> ตั้งค่า
+            <Settings size={19} />
+            {t("ตั้งค่า")}
           </NavLink>
           <NavLink to="/">
-            <Camera size={19} /> หน้าพนักงาน
+            <Camera size={19} />
+            {t("หน้าพนักงาน")}
           </NavLink>
         </nav>
         <div className="admin-profile">
@@ -81,7 +85,8 @@ export function AppLayout() {
               }
             }}
           >
-            <LogOut size={17} /> ออกจากระบบ
+            <LogOut size={17} />
+            {t("ออกจากระบบ")}
           </button>
         </div>
       </aside>
@@ -89,7 +94,7 @@ export function AppLayout() {
         <SiteHeader />
         {error && (
           <p role="alert" className="error-box">
-            {error}
+            {t(error)}
           </p>
         )}
         <Outlet />
@@ -97,10 +102,10 @@ export function AppLayout() {
       <a
         className="back-to-top"
         href="#page-top"
-        aria-label="เลื่อนไปด้านบนสุด"
+        aria-label={t("เลื่อนไปด้านบนสุด")}
       >
         <ArrowUp size={20} />
-        <span>ขึ้นบนสุด</span>
+        <span>{t("ขึ้นบนสุด")}</span>
       </a>
     </div>
   );

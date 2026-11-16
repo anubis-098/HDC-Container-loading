@@ -1,3 +1,4 @@
+import { t, useLanguage, locale } from "../lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import {
   X,
@@ -29,6 +30,7 @@ export function PhotoViewer({
   downloading: boolean;
   downloadError: string;
 }) {
+  useLanguage();
   const dialog = useRef<HTMLDialogElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(initialIndex);
@@ -83,14 +85,15 @@ export function PhotoViewer({
       <div className="photo-viewer-content">
         <div className="viewer-toolbar">
           <h2 id="photo-viewer-title">
-            ภาพที่ {index + 1} / {photos.length}
+            {t("ภาพที่")}
+            {index + 1} / {photos.length}
             {photo.archived_at ? " · Archive" : ""}
           </h2>
           <Button
             variant="outline"
             autoFocus
-            aria-label="ปิดภาพ"
-            title="ปิด (Esc)"
+            aria-label={t("ปิดภาพ")}
+            title={t("ปิด (Esc)")}
             onClick={onClose}
           >
             <X size={20} />
@@ -99,13 +102,13 @@ export function PhotoViewer({
         <div className="viewer-tools">
           {downloadError && (
             <p role="alert" className="error-box viewer-error">
-              {downloadError}
+              {t(downloadError)}
             </p>
           )}
           <Button
             variant="outline"
             disabled={zoom <= 1 || failed || !loaded}
-            aria-label="ซูมออก"
+            aria-label={t("ซูมออก")}
             onClick={() => setZoom((value) => Math.max(1, value - 0.25))}
           >
             <ZoomOut size={19} />
@@ -114,34 +117,35 @@ export function PhotoViewer({
           <Button
             variant="outline"
             disabled={zoom >= 4 || failed || !loaded}
-            aria-label="ซูมเข้า"
+            aria-label={t("ซูมเข้า")}
             onClick={() => setZoom((value) => Math.min(4, value + 0.25))}
           >
             <ZoomIn size={19} />
           </Button>
           <Button
             variant="outline"
-            aria-label="ปรับภาพพอดีหน้าจอ"
+            aria-label={t("ปรับภาพพอดีหน้าจอ")}
             onClick={fit}
           >
-            <Maximize size={18} /> พอดีจอ
+            <Maximize size={18} />
+            {t("พอดีจอ")}
           </Button>
           <Button
             disabled={downloading || failed}
             onClick={() => onDownload(photo, index)}
           >
             <Download size={18} />
-            {downloading ? "กำลังดาวน์โหลด…" : "ดาวน์โหลด"}
+            {downloading ? t("กำลังดาวน์โหลด…") : t("ดาวน์โหลด")}
           </Button>
         </div>
         <div
           className="viewer-viewport"
           ref={viewport}
           tabIndex={0}
-          aria-label="ภาพขยาย เลื่อนเพื่อดูส่วนต่าง ๆ"
+          aria-label={t("ภาพขยาย เลื่อนเพื่อดูส่วนต่าง ๆ")}
         >
           {failed ? (
-            <p role="alert">โหลดภาพไม่สำเร็จ กรุณาปิดแล้วลองใหม่</p>
+            <p role="alert">{t("โหลดภาพไม่สำเร็จ กรุณาปิดแล้วลองใหม่")}</p>
           ) : (
             <>
               <div
@@ -151,7 +155,7 @@ export function PhotoViewer({
                 <img
                   key={photo.id}
                   src={photoUrl(photo)}
-                  alt={`ภาพสินค้าใน Trip ลำดับ ${index + 1}`}
+                  alt={t("ภาพสินค้าใน Trip ลำดับ {0}", index + 1)}
                   onLoad={() => setLoaded(true)}
                   onError={() => setFailed(true)}
                   onDoubleClick={() => {
@@ -162,7 +166,7 @@ export function PhotoViewer({
               </div>
               {!loaded && (
                 <p className="viewer-loading" role="status">
-                  กำลังโหลดภาพ…
+                  {t("กำลังโหลดภาพ…")}
                 </p>
               )}
             </>
@@ -174,15 +178,17 @@ export function PhotoViewer({
             disabled={index === 0}
             onClick={() => setIndex((value) => value - 1)}
           >
-            <ChevronLeft size={18} /> ก่อนหน้า
+            <ChevronLeft size={18} />
+            {t("ก่อนหน้า")}
           </Button>
-          <small>ซูมแล้วเลื่อนภาพเพื่อดูรายละเอียด</small>
+          <small>{t("ซูมแล้วเลื่อนภาพเพื่อดูรายละเอียด")}</small>
           <Button
             variant="outline"
             disabled={index === photos.length - 1}
             onClick={() => setIndex((value) => value + 1)}
           >
-            ถัดไป <ChevronRight size={18} />
+            {t("ถัดไป")}
+            <ChevronRight size={18} />
           </Button>
         </div>
       </div>

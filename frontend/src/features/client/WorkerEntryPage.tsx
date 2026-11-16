@@ -1,3 +1,4 @@
+import { t, useLanguage, locale } from "../../lib/i18n";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -18,6 +19,7 @@ import {
   type Identity,
 } from "../../lib/api";
 export function WorkerEntryPage() {
+  useLanguage();
   const navigate = useNavigate();
   const [name, setName] = useState(() => saved("worker-name"));
   const [busy, setBusy] = useState(false);
@@ -30,7 +32,7 @@ export function WorkerEntryPage() {
   }, []);
   async function start() {
     if (name.trim().length < 2) {
-      setError("กรุณากรอกชื่อ–นามสกุล");
+      setError(t("กรุณากรอกชื่อ–นามสกุล"));
       return;
     }
     setBusy(true);
@@ -61,20 +63,20 @@ export function WorkerEntryPage() {
         <div className="entry-eyebrow">
           <PackageCheck size={16} /> LOADING OPERATIONS
         </div>
-        <h1>พร้อมเริ่มโหลดสินค้า</h1>
-        <p>บันทึกเที่ยวรถและภาพสินค้าในเที่ยวรถ ก่อนส่งถึงปลายทาง</p>
-        <ol className="entry-workflow" aria-label="ขั้นตอนการทำงาน">
+        <h1>{t("พร้อมเริ่มโหลดสินค้า")}</h1>
+        <p>{t("บันทึกเที่ยวรถและภาพสินค้าในเที่ยวรถ ก่อนส่งถึงปลายทาง")}</p>
+        <ol className="entry-workflow" aria-label={t("ขั้นตอนการทำงาน")}>
           <li>
             <Truck size={19} />
-            <span>ข้อมูลรถ</span>
+            <span>{t("ข้อมูลรถ")}</span>
           </li>
           <li>
             <Camera size={19} />
-            <span>ภาพต่อ Trip</span>
+            <span>{t("ภาพต่อ Trip")}</span>
           </li>
           <li>
             <PackageCheck size={19} />
-            <span>ตรวจสอบงาน</span>
+            <span>{t("ตรวจสอบงาน")}</span>
           </li>
         </ol>
       </div>
@@ -87,10 +89,10 @@ export function WorkerEntryPage() {
       >
         <div className="entry-form-title">
           <UserRound size={19} />
-          <h2>ผู้ปฏิบัติงาน</h2>
+          <h2>{t("ผู้ปฏิบัติงาน")}</h2>
         </div>
         <label>
-          ชื่อ–นามสกุล
+          {t("ชื่อ–นามสกุล")}
           <input
             required
             minLength={2}
@@ -99,33 +101,34 @@ export function WorkerEntryPage() {
             autoComplete="name"
             enterKeyHint="go"
             onChange={(event) => setName(event.target.value)}
-            placeholder="กรอกชื่อและนามสกุลของคุณ"
+            placeholder={t("กรอกชื่อและนามสกุลของคุณ")}
             disabled={busy}
           />
         </label>
         {error && (
           <div className="error-box" role="alert">
-            {error}
+            {t(error)}
           </div>
         )}
         <Button className="start-trip-guide" disabled={busy} type="submit">
-          {busy ? "กำลังเข้าสู่ระบบ…" : "เริ่มบันทึกเที่ยวรถ"}
+          {busy ? t("กำลังเข้าสู่ระบบ…") : t("เริ่มบันทึกเที่ยวรถ")}
           <ArrowRight size={20} />
         </Button>
         <p className="client-hint">
-          ระบุชื่อเพื่อใช้เป็นข้อมูลผู้บันทึกในเที่ยวรถนี้
+          {t("ระบุชื่อเพื่อใช้เป็นข้อมูลผู้บันทึกในเที่ยวรถนี้")}
         </p>
         {existing && (
           <Link className="resume-link" to="/client/loading">
-            ทำงานต่อในชื่อ {existing.name} →
+            {t("ทำงานต่อในชื่อ")}
+            {existing.name} →
           </Link>
         )}
       </form>
       <Link className="admin-entry" to="/admin/login">
         <LockKeyhole size={24} />
         <span>
-          <b>เข้าสู่ระบบผู้ดูแล</b>
-          <small>Dashboard และจัดการข้อมูล</small>
+          <b>{t("เข้าสู่ระบบผู้ดูแล")}</b>
+          <small>{t("Dashboard และจัดการข้อมูล")}</small>
         </span>
         <ArrowRight size={20} />
       </Link>

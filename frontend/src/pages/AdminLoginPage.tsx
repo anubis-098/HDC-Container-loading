@@ -1,9 +1,11 @@
+import { t, useLanguage, locale } from "../lib/i18n";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { LockKeyhole } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { api, message } from "../lib/api";
 export function AdminLoginPage() {
+  useLanguage();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -37,10 +39,11 @@ export function AdminLoginPage() {
         }}
       >
         <h1>
-          <LockKeyhole size={24} /> เข้าสู่ระบบ Admin
+          <LockKeyhole size={24} />
+          {t("เข้าสู่ระบบ Admin")}
         </h1>
         <label>
-          ชื่อผู้ใช้
+          {t("ชื่อผู้ใช้")}
           <input
             required
             autoComplete="username"
@@ -50,7 +53,7 @@ export function AdminLoginPage() {
           />
         </label>
         <label>
-          รหัสผ่าน
+          {t("รหัสผ่าน")}
           <input
             required
             type="password"
@@ -61,15 +64,17 @@ export function AdminLoginPage() {
         </label>
         {error && (
           <div className="error-box" role="alert">
-            {error}
+            {t(error)}
           </div>
         )}
         <Button disabled={busy}>
-          {busy ? "กำลังตรวจสอบ…" : "เข้าสู่ระบบ"}
+          {busy ? t("กำลังตรวจสอบ…") : t("เข้าสู่ระบบ")}
         </Button>
       </form>
       <p className="login-help">
-        บัญชีผู้ดูแลสร้างโดยผู้ติดตั้งระบบ หากยังไม่มีบัญชี กรุณาติดต่อ IT
+        {t(
+          "บัญชีผู้ดูแลสร้างโดยผู้ติดตั้งระบบ หากยังไม่มีบัญชี กรุณาติดต่อ IT",
+        )}
       </p>
     </div>
   );

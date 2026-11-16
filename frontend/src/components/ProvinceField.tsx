@@ -1,3 +1,4 @@
+import { t, useLanguage, locale } from "../lib/i18n";
 import { useEffect, useRef, useState } from "react";
 
 export function ProvinceField({
@@ -11,6 +12,7 @@ export function ProvinceField({
   provinces: { name: string }[];
   disabled: boolean;
 }) {
+  useLanguage();
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const input = useRef<HTMLInputElement>(null);
@@ -31,7 +33,7 @@ export function ProvinceField({
   useEffect(() => {
     input.current?.setCustomValidity(
       value.trim() && !provinces.some((p) => p.name === value.trim())
-        ? "กรุณาเลือกจังหวัดจากรายการแนะนำ"
+        ? t("กรุณาเลือกจังหวัดจากรายการแนะนำ")
         : "",
     );
   }, [value, provinces]);
@@ -50,7 +52,7 @@ export function ProvinceField({
         if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
       }}
     >
-      <label htmlFor="truck-province">จังหวัดป้ายทะเบียน</label>
+      <label htmlFor="truck-province">{t("จังหวัดป้ายทะเบียน")}</label>
       <input
         ref={input}
         id="truck-province"
@@ -59,7 +61,7 @@ export function ProvinceField({
         value={value}
         disabled={disabled}
         autoComplete="off"
-        placeholder="ไม่บังคับกรอก"
+        placeholder={t("ไม่บังคับกรอก")}
         aria-autocomplete="list"
         aria-expanded={visible}
         aria-controls="province-options"
@@ -100,13 +102,13 @@ export function ProvinceField({
           }
         }}
       />
-      <small id="province-hint">พิมพ์ 2 ตัวอักษร แล้วเลือกจังหวัด</small>
+      <small id="province-hint">{t("พิมพ์ 2 ตัวอักษร แล้วเลือกจังหวัด")}</small>
       {visible && (
         <div className="province-dropdown">
           <ul
             id="province-options"
             role="listbox"
-            aria-label="จังหวัดป้ายทะเบียน"
+            aria-label={t("จังหวัดป้ายทะเบียน")}
             ref={list}
           >
             {matches.map((province, index) => (
@@ -125,8 +127,8 @@ export function ProvinceField({
           </ul>
           <small role="status">
             {matches.length
-              ? `พบ ${matches.length} จังหวัด`
-              : "ไม่พบจังหวัด กรุณาตรวจสอบคำค้น"}
+              ? t("พบ {0} จังหวัด", matches.length)
+              : t("ไม่พบจังหวัด กรุณาตรวจสอบคำค้น")}
           </small>
         </div>
       )}

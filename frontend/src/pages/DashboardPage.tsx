@@ -1,3 +1,4 @@
+import { t, useLanguage, locale } from "../lib/i18n";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Download, RefreshCw, Search } from "lucide-react";
@@ -12,6 +13,7 @@ type Summary = {
   photos: number;
 };
 export function DashboardPage() {
+  useLanguage();
   const [rows, setRows] = useState<Row[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [search, setSearch] = useState("");
@@ -56,13 +58,13 @@ export function DashboardPage() {
     const lines = [
       [
         "Truck ID",
-        "จังหวัดป้ายทะเบียน",
+        t("จังหวัดป้ายทะเบียน"),
         "Truck Type",
-        "ผู้บันทึก",
-        "สถานะ",
+        t("ผู้บันทึก"),
+        t("สถานะ"),
         "Shipment",
         "Photos",
-        "เวลาสร้าง",
+        t("เวลาสร้าง"),
       ],
       ...rows.map((row) => [
         row.truck_id,
@@ -90,15 +92,15 @@ export function DashboardPage() {
   return (
     <section>
       <h1>Dashboard</h1>
-      <p>ภาพรวมการโหลดสินค้าและภาพรวมของแต่ละเที่ยวรถ</p>
+      <p>{t("ภาพรวมการโหลดสินค้าและภาพรวมของแต่ละเที่ยวรถ")}</p>
       {summary && (
         <div className="stats-grid">
           {[
-            ["เที่ยวรถทั้งหมด", summary.trips],
-            ["งานค้าง", summary.open],
-            ["ปิดงานแล้ว", summary.done],
+            [t("เที่ยวรถทั้งหมด"), summary.trips],
+            [t("งานค้าง"), summary.open],
+            [t("ปิดงานแล้ว"), summary.done],
             ["Shipment", summary.shipments],
-            ["ภาพทั้งหมด", summary.photos],
+            [t("ภาพทั้งหมด"), summary.photos],
           ].map(([label, value]) => (
             <div className="stat-card" key={label}>
               <span>{label}</span>
@@ -118,14 +120,15 @@ export function DashboardPage() {
           }}
         >
           <input
-            aria-label="ค้นหาเที่ยวรถ"
+            aria-label={t("ค้นหาเที่ยวรถ")}
             maxLength={100}
             placeholder="Truck ID / Shipment / Store"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
           <Button disabled={busy}>
-            <Search size={16} /> ค้นหา
+            <Search size={16} />
+            {t("ค้นหา")}
           </Button>
           <Button
             type="button"
@@ -141,27 +144,28 @@ export function DashboardPage() {
             disabled={!rows.length || busy}
             onClick={exportCsv}
           >
-            <Download size={16} /> CSV หน้านี้
+            <Download size={16} />
+            {t("CSV หน้านี้")}
           </Button>
         </form>
         {error && (
           <p className="error-box" role="alert">
-            {error}
+            {t(error)}
           </p>
         )}
         {busy ? (
-          <p role="status">กำลังโหลด…</p>
+          <p role="status">{t("กำลังโหลด…")}</p>
         ) : (
           <div className="table-scroll">
             <table>
               <thead>
                 <tr>
-                  <th>ทะเบียนรถ</th>
-                  <th>ผู้บันทึก</th>
+                  <th>{t("ทะเบียนรถ")}</th>
+                  <th>{t("ผู้บันทึก")}</th>
                   <th>Shipment</th>
                   <th>Photos</th>
-                  <th>สถานะ</th>
-                  <th>วันที่</th>
+                  <th>{t("สถานะ")}</th>
+                  <th>{t("วันที่")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -180,16 +184,16 @@ export function DashboardPage() {
                       <span
                         className={`status-badge ${row.status === "DONE" ? "done" : ""}`}
                       >
-                        {row.status === "DONE" ? "ปิดงานแล้ว" : "งานค้าง"}
+                        {row.status === "DONE" ? t("ปิดงานแล้ว") : t("งานค้าง")}
                       </span>
                     </td>
-                    <td>{new Date(row.created_at).toLocaleString("th-TH")}</td>
+                    <td>{new Date(row.created_at).toLocaleString(locale())}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             {!rows.length && (
-              <p className="empty-state">ไม่พบเที่ยวรถตามเงื่อนไข</p>
+              <p className="empty-state">{t("ไม่พบเที่ยวรถตามเงื่อนไข")}</p>
             )}
           </div>
         )}
@@ -199,15 +203,18 @@ export function DashboardPage() {
             disabled={busy || offset === 0}
             onClick={() => setOffset((value) => Math.max(0, value - 50))}
           >
-            ก่อนหน้า
+            {t("ก่อนหน้า")}
           </Button>
-          <span>หน้า {offset / 50 + 1}</span>
+          <span>
+            {t("หน้า")}
+            {offset / 50 + 1}
+          </span>
           <Button
             variant="outline"
             disabled={busy || rows.length < 50}
             onClick={() => setOffset((value) => value + 50)}
           >
-            ถัดไป
+            {t("ถัดไป")}
           </Button>
         </div>
       </div>
