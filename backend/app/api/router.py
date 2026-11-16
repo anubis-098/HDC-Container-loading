@@ -99,7 +99,7 @@ def logout(request: Request, response: Response):
 @router.get('/stores')
 def stores(who=Depends(actor)):
     with connect() as conn:
-        return conn.execute('SELECT * FROM stores WHERE active=true ORDER BY code').fetchall()
+        return conn.execute('SELECT * FROM stores WHERE active=true AND deleted_at IS NULL ORDER BY code').fetchall()
 
 @router.get('/provinces')
 def provinces(who=Depends(actor)):
@@ -109,14 +109,14 @@ def provinces(who=Depends(actor)):
 @router.get('/admin/stores')
 def admin_stores(who=Depends(admin)):
     with connect() as conn:
-        return conn.execute('SELECT * FROM stores ORDER BY code').fetchall()
+        return conn.execute('SELECT * FROM stores WHERE deleted_at IS NULL ORDER BY code').fetchall()
 
 @router.put('/admin/stores/{code}')
 def save_store(code: str, body: StoreInput, who=Depends(admin)):
     if code != body.code:
         raise HTTPException(422, 'รหัส Store ไม่ตรงกัน')
     with connect() as conn:
-        conn.execute('INSERT INTO stores(code,name,active) VALUES (%s,%s,%s) ON CONFLICT(code) DO UPDATE SET name=excluded.name,active=excluded.active', (body.code,body.name,body.active))
+        conn.execute('INSERT INTO stores(code,name,active) VALUES (%s,%s,%s) ON CONFLICT(code) DO UPDATE SET name=excluded.name,active=excluded.active,deleted_at=NULL', (body.code,body.name,body.active))
         audit(conn, who, 'store.update')
     return body
 
@@ -141,7 +141,7 @@ def create_trip(body: TripInput, who=Depends(worker)):
                 if len(existing)!=1 or existing[0]['number']!=body.shipment_number.upper() or existing[0]['store_code']!=body.store_code:
                     raise HTTPException(409, 'คำขอเดิมมี Shipment หรือ Store ไม่ตรงกัน')
             else:
-                store = conn.execute('SELECT * FROM stores WHERE code=%s AND active=true', (body.store_code,)).fetchone()
+                store = conn.execute('SELECT * FROM stores WHERE code=%s AND active=true AND deleted_at IS NULL', (body.store_code,)).fetchone()
                 if not store:
                     raise HTTPException(422, 'กรุณาเลือก Store ที่เปิดใช้งาน')
                 conn.execute('INSERT INTO shipments VALUES (%s,%s,%s,%s,%s)', (body.id,body.id,body.shipment_number.upper(),body.store_code,store['name']))
@@ -167,7 +167,7 @@ def add_shipment(trip_id: UUID, body: ShipmentInput, who=Depends(worker)):
                 return detail(conn, trip_id, who)
             if conn.execute('SELECT 1 FROM shipments WHERE trip_id=%s', (trip_id,)).fetchone():
                 raise HTTPException(409, 'หนึ่ง Trip มีได้เพียงหนึ่ง Shipment และหนึ่ง Store')
-            store = conn.execute('SELECT * FROM stores WHERE code=%s AND active=true', (body.store_code,)).fetchone()
+            store = conn.execute('SELECT * FROM stores WHERE code=%s AND active=true AND deleted_at IS NULL', (body.store_code,)).fetchone()
             if not store:
                 raise HTTPException(422, 'กรุณาเลือก Store ที่เปิดใช้งาน')
             conn.execute('INSERT INTO shipments VALUES (%s,%s,%s,%s,%s)', (body.id,trip_id,body.number.upper(),body.store_code,store['name']))
@@ -345,16 +345,40 @@ def upload_trip_photo(trip_id: UUID, photo_id: UUID, file: UploadFile = File(...
     return {'id':photo_id}
 
 @router.post('/admin/stores/import')
-async def import_stores(file: UploadFile = File(...), sheet: str = Form(''), who=Depends(admin)):
-    from app.services.store_import import parse_stores
+def import_stores(file: UploadFile = File(...), sheet: str = Form(''), who=Depends(admin)):
+    try:
+        from app.services.store_import import parse_stores
+    except ModuleNotFoundError:
+        raise HTTPException(503, "Excel support is missing. Rebuild the api image: docker compose up -d --build api")
     if not (file.filename or '').lower().endswith('.xlsx'):
         raise HTTPException(422, 'Please upload an XLSX file')
-    data = await file.read(5_000_001)
-    await file.close()
+    data = file.file.read(5_000_001)
+    file.file.close()
     if len(data)>5_000_000:
         raise HTTPException(413, 'Maximum file size is 5 MB')
     records = parse_stores(data, sheet.strip())
     with connect() as conn:
         for code,name in records.items():
-            conn.execute('INSERT INTO stores(code,name,active) VALUES (%s,%s,true) ON CONFLICT(code) DO UPDATE SET name=excluded.name', (code,name))
+            conn.execute('INSERT INTO stores(code,name,active) VALUES (%s,%s,true) ON CONFLICT(code) DO UPDATE SET name=excluded.name,active=CASE WHEN stores.deleted_at IS NOT NULL THEN true ELSE stores.active END,deleted_at=NULL', (code,name))
     return {'imported': len(records)}
+
+@router.post('/admin/stores/excel-sheets')
+def store_excel_sheets(file: UploadFile = File(...), who=Depends(admin)):
+    try:
+        from app.services.store_import import workbook_sheets
+    except ModuleNotFoundError:
+        raise HTTPException(503, 'Excel support is missing. Rebuild the api image: docker compose up -d --build api')
+    data = file.file.read(5_000_001)
+    file.file.close()
+    if len(data)>5_000_000:
+        raise HTTPException(413, 'Maximum file size is 5 MB')
+    return {'sheets': workbook_sheets(data)}
+
+@router.post('/admin/stores/delete-all')
+def delete_all_stores(body: dict, who=Depends(admin)):
+    if body.get('confirmation') != 'DELETE ALL STORES':
+        raise HTTPException(422, 'Type DELETE ALL STORES to confirm')
+    with connect() as conn:
+        result = conn.execute('UPDATE stores SET active=false,deleted_at=now() WHERE deleted_at IS NULL')
+        count = result.rowcount
+    return {'deleted': count}
