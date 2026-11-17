@@ -6,6 +6,7 @@ import "./styles/theme.css";
 import "./styles/client.css";
 import "./styles/language.css";
 import "./styles/shared-ui.css";
+import "./styles/header.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
