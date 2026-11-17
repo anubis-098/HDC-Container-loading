@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Download, RefreshCw, Search } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { DashboardDonut } from "../components/DashboardDonut";
 import { api, message, type Trip } from "../lib/api";
 type Row = Trip & { shipment_count: number; photo_count: number };
 type Summary = {
@@ -117,6 +118,9 @@ export function DashboardPage() {
         }}>{t("ลบที่เลือก")}</Button>
       </div>
       <p>{t("ภาพรวมการโหลดสินค้าและภาพรวมของแต่ละเที่ยวรถ")}</p>
+      {summary && (
+        <DashboardDonut open={summary.open} done={summary.done}/>
+      )}
       {summary && (
         <div className="stats-grid">
           {[

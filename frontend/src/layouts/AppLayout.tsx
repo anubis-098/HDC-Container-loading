@@ -55,6 +55,7 @@ export function AppLayout() {
           className="logo"
         />
         <h2>Container Loading</h2>
+        <small>ADMINISTRATION</small>
         <nav aria-label={t("เมนูหลัก")}>
           <NavLink to="/admin" end>
             <LayoutDashboard size={19} /> Dashboard
