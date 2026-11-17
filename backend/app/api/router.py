@@ -92,8 +92,8 @@ def admin_me(who=Depends(admin)):
 def logout(request: Request, response: Response):
     import hashlib
     with connect() as conn:
-        conn.execute('DELETE FROM sessions WHERE token_hash=%s', (hashlib.sha256(request.cookies.get('admin_session','').encode()).hexdigest(),))
-    response.delete_cookie('admin_session', path='/')
+        conn.execute('DELETE FROM sessions WHERE token_hash=%s', (hashlib.sha256(request.cookies.get('hdc_container_admin_session','').encode()).hexdigest(),))
+    response.delete_cookie('hdc_container_admin_session', path='/')
     return {'ok': True}
 
 @router.get('/stores')
