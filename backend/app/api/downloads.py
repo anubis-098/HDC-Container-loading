@@ -12,6 +12,48 @@ from app.db.connection import connect
 
 router = APIRouter(prefix='/admin/trips', tags=['downloads'])
 
+@router.post('/photos.zip')
+def download_selected_photos(ids: list[UUID], who=Depends(admin)):
+    import re
+    from zoneinfo import ZoneInfo
+    if not ids or len(ids) > 50:
+        raise HTTPException(422, 'Select 1-50 trips')
+    def safe(value):
+        return re.sub(r'[\\/:*?"<>|\x00-\x1f]', '-', str(value)).strip(' .')[:100] or 'unknown'
+    output = TemporaryFile()
+    try:
+        with connect() as conn, ZipFile(output, 'w', ZIP_STORED) as archive:
+            count = 0
+            for trip_id in sorted(set(ids)):
+                trip = trip_access(conn, trip_id, who)
+                conn.execute('SELECT id FROM trips WHERE id=%s FOR SHARE', (trip_id,))
+                shipments = conn.execute('SELECT number FROM shipments WHERE trip_id=%s ORDER BY number', (trip_id,)).fetchall()
+                rows = conn.execute('SELECT * FROM photos WHERE trip_id=%s ORDER BY uploaded_at,id FOR SHARE', (trip_id,)).fetchall()
+                for row in rows:
+                    numbers = []
+                    if row.get('pallet_id'):
+                        shipment = conn.execute('SELECT s.number FROM shipments s JOIN pallets p ON p.shipment_id=s.id WHERE p.id=%s', (row['pallet_id'],)).fetchone()
+                        if shipment: numbers = [shipment['number']]
+                    if not numbers: numbers = [s['number'] for s in shipments] or ['NO-SHIPMENT']
+                    day = row['uploaded_at'].astimezone(ZoneInfo('Asia/Bangkok')).strftime('%Y%m%d')
+                    # Trip-level images belong to every Shipment on the trip.
+                    content = image_bytes(row)
+                    for number in numbers:
+                        base = f"{safe(number)}_{safe(trip['truck_id'])}_{day}"
+                        archive.writestr(f"{base}/{base}_{row['id']}.jpg", content)
+                        count += 1
+            if not count: raise HTTPException(404, 'No photos in selected trips')
+        size = output.tell()
+        output.seek(0)
+    except BaseException:
+        output.close()
+        raise
+    def chunks():
+        try:
+            while chunk := output.read(64*1024): yield chunk
+        finally: output.close()
+    return StreamingResponse(chunks(), media_type='application/zip', headers={'Content-Disposition':'attachment; filename="container-loading-photos.zip"','Content-Length':str(size),'Cache-Control':'no-store'}, background=BackgroundTask(output.close))
+
 def image_bytes(row):
     if row['archived_at']:
         try:

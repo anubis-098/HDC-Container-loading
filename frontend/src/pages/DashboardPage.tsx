@@ -96,6 +96,17 @@ export function DashboardPage() {
     <section>
       <h1>Dashboard</h1>
       <div className="table-tools">
+        <Button disabled={busy || !selected.length || actionBusy} onClick={async () => {
+          setActionBusy(true); setError('');
+          try {
+            const response = await fetch('/api/admin/trips/photos.zip', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify(selected)});
+            if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(body.detail || 'Download failed'); }
+            const url = URL.createObjectURL(await response.blob());
+            const link = document.createElement('a'); link.href=url; link.download='container-loading-photos.zip'; link.click();
+            setTimeout(() => URL.revokeObjectURL(url),1000);
+          } catch(error) { setError(message(error)); }
+          finally { setActionBusy(false); }
+        }}><Download size={16}/>ดาวน์โหลดรูปที่เลือก ({selected.length})</Button>
         <Button disabled={!selected.length || actionBusy} onClick={exportCsv}>{t("ดาวน์โหลดที่เลือก")} ({selected.length}) CSV</Button>
         <Button disabled={!selected.length || actionBusy} onClick={async () => {
           if (!window.confirm(t("ยืนยันลบรายการที่เลือกและภาพทั้งหมด?"))) return;

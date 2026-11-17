@@ -2,6 +2,7 @@ import { t, useLanguage, locale } from "../lib/i18n";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Clock } from "./Clock";
+import { ConnectionStatus } from "./ConnectionStatus";
 import { LanguageSwitch } from "../lib/i18n";
 export function SiteHeader() {
   useLanguage();
@@ -43,6 +44,7 @@ export function SiteHeader() {
       </div>
       <LanguageSwitch />
       <Clock />
+      {!location.pathname.startsWith('/admin') && <ConnectionStatus />}
     </header>
   );
 }
