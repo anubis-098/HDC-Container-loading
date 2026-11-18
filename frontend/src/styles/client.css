@@ -501,6 +501,7 @@
   background: #e7f6ee;
   color: #157a52;
 }
+.status-badge.cancelled { background: #edf0f3; color: #526273; }
 .shipment-heading {
   display: flex;
   justify-content: space-between;
@@ -635,6 +636,16 @@
   border-bottom: 0;
   z-index: 25;
   box-shadow: 0 -4px 12px #20324705;
+}
+.work-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.work-footer-actions > .full-width {
+  flex: 1;
+  width: auto;
+  min-width: 0;
 }
 .work-footer small {
   display: block;
@@ -892,9 +903,74 @@
   color: #60768a;
 }
 .work-context {
-  padding: 12px 14px;
+  padding: 8px 12px;
   background: white;
   border-bottom: 1px solid #dce7ef;
+}
+.work-context-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.work-context-row > .worker-heading {
+  flex: 1;
+  min-width: 0;
+}
+.work-trip-tab {
+  flex: 0 0 auto;
+  max-width: 78%;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid #c8ddec;
+  border-radius: 10px;
+  background: #edf7ff;
+  text-align: right;
+}
+.work-trip-tab h2 {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+}
+.work-trip-tab h2 small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--client-muted);
+}
+.trip-context-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--client-muted);
+}
+.trip-context-meta .status-badge {
+  padding: 2px 5px;
+  font-size: inherit;
+}
+.work-context .work-steps {
+  margin-top: 6px;
+}
+@media (max-width: 380px) {
+  .work-context-row .worker-avatar { display: none; }
+  .trip-context-meta { gap: 4px; font-size: 10px; }
+}
+.trip-registration {
+  padding: 4px 8px;
+  border: 1px solid #e4bc28;
+  border-radius: 6px;
+  background: #ffe45c;
+  color: #302700;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 @media print {
   .site-header {

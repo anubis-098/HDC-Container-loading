@@ -5,7 +5,7 @@ from threading import Lock
 from uuid import UUID, uuid4
 from fastapi import Form, APIRouter, Depends, HTTPException, Request, Response, UploadFile, File
 from psycopg.errors import UniqueViolation
-from app.api.schemas import WorkerInput, LoginInput, TripInput, ShipmentInput, PalletInput, StoreInput
+from app.api.schemas import WorkerInput, LoginInput, TripInput, ShipmentInput, PalletInput, StoreInput, TripPalletInput
 from app.core.security import worker, admin, actor, create_session, password_matches, password_hash, trip_access
 from app.db.connection import connect
 from app.services.images import normalize_image
@@ -22,11 +22,14 @@ def detail(conn, trip_id, who):
     trip = trip_access(conn, trip_id, who)
     trip['worker_name'] = conn.execute('SELECT name FROM workers WHERE id=%s', (trip['worker_id'],)).fetchone()['name']
     trip['shipments'] = conn.execute('SELECT * FROM shipments WHERE trip_id=%s ORDER BY number', (trip_id,)).fetchall()
+    trip['photos'] = conn.execute('SELECT id,pallet_id,side,byte_size,uploaded_at,archived_at FROM photos WHERE trip_id=%s ORDER BY uploaded_at,id', (trip_id,)).fetchall()
+    trip['pallets'] = conn.execute('SELECT * FROM pallets WHERE trip_id=%s ORDER BY number,id', (trip_id,)).fetchall()
+    order_rows = conn.execute('SELECT o.* FROM pallet_orders o JOIN pallets p ON p.id=o.pallet_id WHERE p.trip_id=%s ORDER BY o.position', (trip_id,)).fetchall()
+    for pallet in trip['pallets']:
+        pallet['orders'] = [o['order_number'] for o in order_rows if o['pallet_id']==pallet['id']]
+        pallet['photos'] = [photo for photo in trip['photos'] if photo['pallet_id']==pallet['id']]
     for shipment in trip['shipments']:
-        shipment['pallets'] = conn.execute('SELECT * FROM pallets WHERE shipment_id=%s ORDER BY number', (shipment['id'],)).fetchall()
-        for pallet in shipment['pallets']:
-            pallet['photos'] = conn.execute('SELECT id,side,byte_size,uploaded_at,archived_at FROM photos WHERE pallet_id=%s ORDER BY side', (pallet['id'],)).fetchall()
-    trip['photos'] = conn.execute('SELECT id,side,byte_size,uploaded_at,archived_at FROM photos WHERE trip_id=%s ORDER BY uploaded_at,id', (trip_id,)).fetchall()
+        shipment['pallets'] = [p for p in trip['pallets'] if p['shipment_id']==shipment['id']]
     return trip
 
 @router.get('/health')
@@ -131,6 +134,14 @@ def create_trip(body: TripInput, who=Depends(worker)):
         with connect() as conn:
             if body.truck_province is not None and not conn.execute('SELECT 1 FROM provinces WHERE name=%s', (body.truck_province,)).fetchone():
                 raise HTTPException(422, 'กรุณาเลือกจังหวัดป้ายทะเบียนจากรายการ')
+            if body.shipment_number is None:
+                conn.execute('INSERT INTO trips(id,worker_id,truck_id,truck_type,truck_province,structure_version) VALUES(%s,%s,%s,%s,%s,2) ON CONFLICT(id) DO NOTHING', (body.id,who['id'],body.truck_id,body.truck_type,body.truck_province))
+                current = trip_access(conn, body.id, who)
+                if current['structure_version']!=2 or (current['truck_id'],current['truck_type'],current['truck_province'])!=(body.truck_id,body.truck_type,body.truck_province):
+                    raise HTTPException(409, 'Trip request does not match existing vehicle data')
+                if not conn.execute("SELECT 1 FROM audit_log WHERE event='trip.create' AND target_id=%s", (body.id,)).fetchone():
+                    audit(conn, who, 'trip.create', body.id)
+                return detail(conn, body.id, who)
             conn.execute('INSERT INTO trips(id,worker_id,truck_id,truck_type,truck_province) VALUES (%s,%s,%s,%s,%s) ON CONFLICT(id) DO NOTHING', (body.id,who['id'],body.truck_id,body.truck_type,body.truck_province))
             result = trip_access(conn, body.id, who)
             conn.execute('SELECT id FROM trips WHERE id=%s FOR UPDATE', (body.id,))
@@ -176,11 +187,55 @@ def add_shipment(trip_id: UUID, body: ShipmentInput, who=Depends(worker)):
     except UniqueViolation:
         raise HTTPException(409, 'เลข Shipment นี้มีในระบบแล้ว กรุณาตรวจสอบงานค้าง')
 
+def save_trip_pallet(conn, trip_id, body, who, editing=False):
+    trip_access(conn, trip_id, who, True)
+    existing = conn.execute('SELECT * FROM pallets WHERE id=%s', (body.id,)).fetchone()
+    if existing and existing['trip_id'] != trip_id:
+        raise HTTPException(409, 'Pallet ID is already used by another Trip')
+    if editing and not existing:
+        raise HTTPException(404, 'Pallet not found')
+    current_orders = [o['order_number'] for o in conn.execute('SELECT order_number FROM pallet_orders WHERE pallet_id=%s ORDER BY position', (body.id,)).fetchall()]
+    if existing and not editing:
+        if existing['store_code'] != body.store_code or current_orders != body.orders:
+            raise HTTPException(409, 'Pallet request does not match existing data')
+        return detail(conn, trip_id, who)
+    if existing and existing['store_code']==body.store_code:
+        store_name = existing['store_name']
+    else:
+        store = conn.execute('SELECT * FROM stores WHERE code=%s AND active=true AND deleted_at IS NULL FOR SHARE', (body.store_code,)).fetchone()
+        if not store:
+            raise HTTPException(422, 'กรุณาเลือก Store ที่เปิดใช้งาน')
+        store_name = store['name']
+    if existing:
+        conn.execute('UPDATE pallets SET store_code=%s,store_name=%s WHERE id=%s', (body.store_code,store_name,body.id))
+    else:
+        number = conn.execute('SELECT COALESCE(MAX(number),0)+1 AS n FROM pallets WHERE trip_id=%s', (trip_id,)).fetchone()['n']
+        conn.execute('INSERT INTO pallets(id,trip_id,number,store_code,store_name) VALUES(%s,%s,%s,%s,%s)', (body.id,trip_id,number,body.store_code,store_name))
+    conn.execute('DELETE FROM pallet_orders WHERE pallet_id=%s', (body.id,))
+    for position, order in enumerate(body.orders):
+        conn.execute('INSERT INTO pallet_orders(pallet_id,order_number,position) VALUES(%s,%s,%s)', (body.id,order,position))
+    conn.execute('UPDATE trips SET structure_version=2 WHERE id=%s', (trip_id,))
+    audit(conn, who, 'pallet.update' if existing else 'pallet.create', body.id)
+    return detail(conn, trip_id, who)
+
+@router.post('/trips/{trip_id}/pallets')
+def create_trip_pallet(trip_id: UUID, body: TripPalletInput, who=Depends(worker)):
+    with connect() as conn:
+        return save_trip_pallet(conn, trip_id, body, who)
+
+@router.put('/trips/{trip_id}/pallets/{pallet_id}')
+def update_trip_pallet(trip_id: UUID, pallet_id: UUID, body: TripPalletInput, who=Depends(worker)):
+    if pallet_id != body.id:
+        raise HTTPException(422, 'Pallet ID does not match')
+    with connect() as conn:
+        return save_trip_pallet(conn, trip_id, body, who, editing=True)
+
 @router.post('/trips/{trip_id}/shipments/{shipment_id}/pallets')
 def add_pallet(trip_id: UUID, shipment_id: UUID, body: PalletInput, who=Depends(worker)):
     with connect() as conn:
         trip_access(conn, trip_id, who, True)
-        if not conn.execute('SELECT 1 FROM shipments WHERE id=%s AND trip_id=%s', (shipment_id,trip_id)).fetchone():
+        shipment = conn.execute('SELECT * FROM shipments WHERE id=%s AND trip_id=%s', (shipment_id,trip_id)).fetchone()
+        if not shipment:
             raise HTTPException(404, 'ไม่พบ Shipment')
         existing = conn.execute('SELECT * FROM pallets WHERE id=%s', (body.id,)).fetchone()
         if existing:
@@ -188,7 +243,7 @@ def add_pallet(trip_id: UUID, shipment_id: UUID, body: PalletInput, who=Depends(
                 raise HTTPException(409, 'Pallet ID ซ้ำ')
         else:
             number = conn.execute('SELECT COALESCE(MAX(number),0)+1 AS n FROM pallets WHERE shipment_id=%s', (shipment_id,)).fetchone()['n']
-            conn.execute('INSERT INTO pallets VALUES (%s,%s,%s)', (body.id,shipment_id,number))
+            conn.execute('INSERT INTO pallets(id,shipment_id,number,trip_id,store_code,store_name) VALUES (%s,%s,%s,%s,%s,%s)', (body.id,shipment_id,number,trip_id,shipment['store_code'],shipment['store_name']))
         return detail(conn, trip_id, who)
 
 @router.put('/trips/{trip_id}/pallets/{pallet_id}/photos/{side}')
@@ -244,7 +299,11 @@ def complete(trip_id: UUID, who=Depends(worker)):
             return detail(conn, trip_id, who)
         trip_access(conn, trip_id, who, True)
         current = detail(conn, trip_id, who)
-        if len(current['shipments']) != 1 or not current['photos']:
+        if current['structure_version']==2 and (not current['pallets'] or not current['photos']):
+            raise HTTPException(409, 'Add at least one Pallet with a Store and upload at least one photo before completing the Trip')
+        if current['structure_version']==2 and any(not pallet['orders'] for pallet in current['pallets']):
+            raise HTTPException(409, 'กรุณาระบุเลข Order ให้ทุก Pallet ก่อนปิดเที่ยวรถ')
+        if current['structure_version']==1 and (len(current['shipments']) != 1 or not current['photos']):
             raise HTTPException(409, 'ต้องมี Shipment เดียวและภาพอย่างน้อย 1 ภาพก่อนปิดเที่ยวรถ')
         ids = [photo['id'] for photo in current['photos']]
         with connect(True) as images:
@@ -255,6 +314,19 @@ def complete(trip_id: UUID, who=Depends(worker)):
         audit(conn, who, 'trip.complete', trip_id)
         return detail(conn, trip_id, who)
 
+@router.post('/admin/trips/{trip_id}/cancel')
+def cancel_trip(trip_id: UUID, who=Depends(admin)):
+    with connect() as conn:
+        trip = trip_access(conn, trip_id, who)
+        trip = conn.execute('SELECT * FROM trips WHERE id=%s FOR UPDATE', (trip_id,)).fetchone()
+        if trip['status'] == 'CANCELLED':
+            return detail(conn, trip_id, who)
+        if trip['status'] != 'OPEN':
+            raise HTTPException(409, 'ยกเลิกได้เฉพาะงานค้างเท่านั้น')
+        conn.execute("UPDATE trips SET status='CANCELLED',cancelled_at=now(),cancelled_by=%s WHERE id=%s", (who['id'],trip_id))
+        audit(conn, who, 'trip.cancel', trip_id)
+        return detail(conn, trip_id, who)
+
 @router.get('/admin/trips')
 def admin_trips(q: str = '', offset: int = 0, who=Depends(admin)):
     if len(q)>100 or offset<0:
@@ -262,15 +334,16 @@ def admin_trips(q: str = '', offset: int = 0, who=Depends(admin)):
     with connect() as conn:
         return conn.execute('''SELECT t.*,w.name AS worker_name,
           (SELECT count(*) FROM shipments s WHERE s.trip_id=t.id) AS shipment_count,
-          (SELECT count(*) FROM photos f WHERE f.trip_id=t.id) AS photo_count
+          (SELECT count(*) FROM photos f WHERE f.trip_id=t.id) AS photo_count, (SELECT count(*) FROM pallets p WHERE p.trip_id=t.id) AS pallet_count
           FROM trips t JOIN workers w ON w.id=t.worker_id
           WHERE t.truck_id ILIKE %s OR t.truck_province ILIKE %s OR EXISTS(SELECT 1 FROM shipments s WHERE s.trip_id=t.id AND (s.number ILIKE %s OR s.store_name ILIKE %s OR s.store_code ILIKE %s))
-          ORDER BY t.created_at DESC,t.id DESC LIMIT 50 OFFSET %s''', (f'%{q}%',f'%{q}%',f'%{q}%',f'%{q}%',f'%{q}%',offset)).fetchall()
+          OR EXISTS(SELECT 1 FROM pallets p LEFT JOIN pallet_orders o ON o.pallet_id=p.id WHERE p.trip_id=t.id AND (p.store_name ILIKE %s OR p.store_code ILIKE %s OR o.order_number ILIKE %s))
+          ORDER BY t.created_at DESC,t.id DESC LIMIT 50 OFFSET %s''', (f'%{q}%',f'%{q}%',f'%{q}%',f'%{q}%',f'%{q}%',f'%{q}%',f'%{q}%',f'%{q}%',offset)).fetchall()
 
 @router.get('/admin/summary')
 def summary(who=Depends(admin)):
     with connect() as conn:
-        return conn.execute("SELECT count(*) AS trips, count(*) FILTER(WHERE status='OPEN') AS open, count(*) FILTER(WHERE status='DONE') AS done, (SELECT count(*) FROM shipments) AS shipments, (SELECT count(*) FROM photos) AS photos FROM trips").fetchone()
+        return conn.execute("SELECT count(*) AS trips, count(*) FILTER(WHERE status='OPEN') AS open, count(*) FILTER(WHERE status='DONE') AS done, count(*) FILTER(WHERE status='CANCELLED') AS cancelled, (SELECT count(*) FROM shipments) AS shipments, (SELECT count(*) FROM pallets) AS pallets, (SELECT count(*) FROM photos) AS photos FROM trips").fetchone()
 
 
 @router.get('/admin/storage')
@@ -319,15 +392,17 @@ def plate_ocr(file: UploadFile = File(...), who=Depends(worker)):
     return recognize_plate(content)
 
 @router.put('/trips/{trip_id}/photos/{photo_id}')
-def upload_trip_photo(trip_id: UUID, photo_id: UUID, file: UploadFile = File(...), who=Depends(worker)):
+def upload_trip_photo(trip_id: UUID, photo_id: UUID, file: UploadFile = File(...), pallet_id: UUID | None = None, who=Depends(worker)):
     content = file.file.read(8 * 1024 * 1024 + 1)
     if len(content)>8 * 1024 * 1024:
         raise HTTPException(413, 'ไฟล์ภาพต้องไม่เกิน 8 MB')
     data, digest = normalize_image(content)
     with connect() as conn:
         trip_access(conn, trip_id, who, True)
+        if pallet_id is not None and not conn.execute('SELECT 1 FROM pallets WHERE id=%s AND trip_id=%s', (pallet_id,trip_id)).fetchone():
+            raise HTTPException(404, 'Pallet does not belong to this Trip')
         previous = conn.execute('SELECT * FROM photos WHERE id=%s', (photo_id,)).fetchone()
-        if previous and (previous['trip_id'] != trip_id or previous['sha256'] != digest):
+        if previous and (previous['trip_id'] != trip_id or previous['sha256'] != digest or previous['pallet_id'] != pallet_id):
             raise HTTPException(409, 'Photo ID ซ้ำกับภาพอื่น กรุณาโหลดหน้าจอใหม่')
         if not previous and conn.execute('SELECT count(*) AS n FROM photos WHERE trip_id=%s', (trip_id,)).fetchone()['n'] >= 120:
             raise HTTPException(409, 'เที่ยวรถนี้มีภาพครบ 120 ภาพแล้ว')
@@ -336,7 +411,7 @@ def upload_trip_photo(trip_id: UUID, photo_id: UUID, file: UploadFile = File(...
             blob = images.execute('SELECT sha256 FROM photo_blobs WHERE id=%s', (photo_id,)).fetchone()
             if blob['sha256'] != digest:
                 raise HTTPException(409, 'Photo ID มีข้อมูลภาพต่างกัน')
-        conn.execute('INSERT INTO photos(id,trip_id,sha256,byte_size) VALUES (%s,%s,%s,%s) ON CONFLICT(id) DO NOTHING', (photo_id,trip_id,digest,len(data)))
+        conn.execute('INSERT INTO photos(id,trip_id,sha256,byte_size,pallet_id) VALUES (%s,%s,%s,%s,%s) ON CONFLICT(id) DO NOTHING', (photo_id,trip_id,digest,len(data),pallet_id))
         stored = conn.execute('SELECT trip_id FROM photos WHERE id=%s', (photo_id,)).fetchone()
         if stored['trip_id'] != trip_id:
             raise HTTPException(409, 'Photo ID ถูกใช้กับเที่ยวรถอื่นแล้ว')

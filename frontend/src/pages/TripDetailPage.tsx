@@ -13,6 +13,7 @@ export function TripDetailPage() {
   const [downloadError, setDownloadError] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   useEffect(() => {
     let active = true;
     setTrip(null);
@@ -80,18 +81,43 @@ export function TripDetailPage() {
             <p>
               {t("ผู้บันทึก:")}
               {trip.worker_name} ·{" "}
-              {trip.status === "DONE" ? t("ปิดงานแล้ว") : t("งานค้าง")}
+              {trip.status === "CANCELLED" ? t("ยกเลิกแล้ว") : trip.status === "DONE" ? t("ปิดงานแล้ว") : t("งานค้าง")}
             </p>
             <p>{new Date(trip.created_at).toLocaleString(locale())}</p>
+            {trip.status === "OPEN" && <Button variant="outline" disabled={cancelling} onClick={async () => {
+              if (!window.confirm(`ยกเลิกงานค้างทะเบียน ${trip.truck_id}? ข้อมูลและรูปภาพจะยังคงอยู่`)) return;
+              setCancelling(true); setError("");
+              try { setTrip(await api<Trip>(`/admin/trips/${trip.id}/cancel`, {method:"POST"})); }
+              catch (error) { setError(message(error)); }
+              finally { setCancelling(false); }
+            }}>{cancelling ? "กำลังยกเลิก…" : "ยกเลิกงานค้าง"}</Button>}
           </div>
-          <div className="panel">
-            <h2>Shipment / Store</h2>
-            {trip.shipments.map((item) => (
-              <p key={item.id}>
-                {item.number} → {item.store_code} · {item.store_name}
+          {trip.shipments.length > 0 && (
+            <div className="panel">
+              <h2>Shipment เดิม / Store</h2>
+              {trip.shipments.map((item) => (
+                <p key={item.id}>
+                  {item.number} → {item.store_code} · {item.store_name}
+                </p>
+              ))}
+            </div>
+          )}
+          {trip.pallets.map((pallet) => (
+            <div className="panel" key={pallet.id}>
+              <h2>Pallet {pallet.number}</h2>
+              <p>
+                {pallet.store_code} · {pallet.store_name}
               </p>
-            ))}
-          </div>
+              <div className="order-tags">
+                {pallet.orders.length ? (
+                  pallet.orders.map((order) => <span key={order}>{order}</span>)
+                ) : (
+                  <small>ไม่ระบุเลข Order</small>
+                )}
+              </div>
+              <small>ภาพ Pallet {pallet.photos.length} ภาพ</small>
+            </div>
+          ))}
           <div className="panel">
             <div className="evidence-actions">
               <h2>
@@ -156,6 +182,12 @@ export function TripDetailPage() {
                     </span>
                   </button>
                   <figcaption>
+                    <b>
+                      {photo.pallet_id
+                        ? `Pallet ${trip.pallets.find((p) => p.id === photo.pallet_id)?.number || ""}`
+                        : "ภาพรวม Trip"}{" "}
+                      ·{" "}
+                    </b>
                     {t("ภาพที่")}
                     {index + 1}
                     {photo.archived_at ? " · Archive" : ""}

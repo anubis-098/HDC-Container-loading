@@ -49,7 +49,7 @@ export function WorkerEntryPage() {
       remember("truck-draft", "");
       remember("province-draft", "");
       remember("truck-type-draft", "");
-      remember("trip-request:" + identity.id, uid());
+      remember("trip-request-v2:" + identity.id, uid());
       navigate("/client/loading");
     } catch (error) {
       setError(message(error));

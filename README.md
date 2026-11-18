@@ -1,10 +1,10 @@
 # CJ Logistics · Container Loading
 
-รุ่นปัจจุบัน: **Trip → ภาพรวม 1–120 ภาพ** พร้อม Shipment เดียว / Store เดียวต่อเที่ยวรถ, Dropdown ชนิดรถ และกล้องอ่านทะเบียน OCR ที่ให้ตรวจแก้ก่อนยืนยัน ดูขั้นตอนอัปเกรดใน [Trip photo upgrade](docs/trip-photo-upgrade.md)
+รุ่นปัจจุบันหลัง UAT: **Trip → หลาย Pallet → หลาย Order ต่อ Pallet** ทุก Pallet ระบุ Store ของตัวเอง มีทั้งภาพรวม Trip และภาพแยก Pallet รวมสูงสุด 120 ภาพ ดูรายละเอียดและการรักษาข้อมูลเก่าใน [Pallet / Order upgrade](docs/pallet-order-upgrade.md)
 
 
 React + TypeScript + FastAPI + PostgreSQL แยกฐานข้อมูลทั่วไปและภาพ
-โครงสร้างข้อมูล: **Trip → Photo (สูงสุด 120 ภาพ)** และ **Trip → Shipment / Store**
+โครงสร้างใหม่: **Trip → Pallet → Orders / Store** และ **Trip → Photos** (ภาพระบุ Pallet ได้) ข้อมูล Shipment เดิมยังเก็บไว้สำหรับงานเก่า
 
 ## เริ่มระบบบน Windows 11 Pro
 
@@ -29,18 +29,18 @@ docker compose exec api python -m app.manage create-admin
 ```
 
 4. เปิด `/admin/login` เข้าระบบ → เมนู Store → เพิ่ม Store ปลายทาง
-5. กลับหน้า `/` กรอกชื่อ–นามสกุล → เริ่ม Trip → บันทึกรถ → เพิ่ม Shipment → ถ่ายภาพของ Trip (1–120 ภาพ) → ยืนยันปิดงาน
+5. กลับหน้า `/` กรอกชื่อ–นามสกุล → เริ่ม Trip ด้วยข้อมูลรถ → เพิ่ม Pallet / Store / เลข Order → ถ่ายภาพรวมรถและภาพ Pallet → ยืนยันปิดงาน
 
 ## สิ่งที่ใช้งานได้ในโค้ดชุดนี้
 
 - หน้าแรกและหน้าทำงานแบบ Handheld อ้างอิงโครงสร้าง `example_index.html`: แบรนด์/นาฬิกา การ์ดชื่อ ปุ่ม Admin ส่วนข้อมูลรถ ส่วนถ่ายภาพ และแถบปิดงานด้านล่าง
 - Session พนักงานไม่ใช้รหัสผ่านตามต้นแบบ (ชื่อเป็นการระบุตนเอง ไม่ใช่การยืนยันตัวบุคคล)
 - Session Admin ใช้รหัสผ่าน scrypt, cookie HttpOnly, ตรวจสิทธิ์ที่ API และป้องกัน cross-origin mutation
-- เที่ยวรถ/Shipment/Pallet บันทึก PostgreSQL จริง หนึ่ง Shipment และหนึ่ง Store ต่อ Trip พร้อมภาพรวมของ Trip
+- เที่ยวรถ/Pallet/Order บันทึก PostgreSQL จริง หนึ่ง Trip มีหลาย Store ผ่าน Pallet แต่ละรายการ พร้อมภาพสองระดับ
 - เลข Shipment ไม่ซ้ำทั้งระบบ; คำขอสร้างเดิมใช้ UUID เดิมเพื่อรองรับการส่งซ้ำ
 - ภาพถูกบีบอัด ตรวจและแปลงเป็น JPEG ที่ Backend; binary อยู่ PostgreSQL อีกฐาน
 - IndexedDB เก็บภาพก่อนส่ง ส่งซ้ำเมื่อกลับออนไลน์/กด retry; รีเฟรชแล้วกลับมาทำต่อผ่านงานค้าง
-- ปิดงานได้เมื่อมี Shipment และภาพอย่างน้อย 1 ภาพ ตรวจข้อมูลฝั่งเซิร์ฟเวอร์ด้วย
+- Trip ใหม่ปิดงานได้เมื่อมี Pallet อย่างน้อยหนึ่งรายการและภาพอย่างน้อยหนึ่งภาพ ส่งคิวภาพให้ครบก่อนยืนยัน ตรวจข้อมูลฝั่งเซิร์ฟเวอร์ด้วย งานเก่าใช้กติกาเดิม
 - Dashboard/ค้นหา/ดูหลักฐาน/CSV ของหน้าปัจจุบัน/จัดการ Store
 - Archive พร้อมตรวจ checksum ก่อนลบต้นทาง; ข้อมูลธุรกิจยังอยู่
 

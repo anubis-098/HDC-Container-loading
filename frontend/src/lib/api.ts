@@ -1,10 +1,11 @@
 export type Photo = {
   id: string;
+  pallet_id: string | null;
   side: string | null;
   byte_size: number;
   archived_at: string | null;
 };
-export type Pallet = { id: string; number: number; photos: Photo[] };
+export type Pallet = { id: string; number: number; store_code: string; store_name: string; orders: string[]; photos: Photo[] };
 export type Shipment = {
   id: string;
   number: string;
@@ -17,13 +18,15 @@ export type Trip = {
   truck_id: string;
   truck_province: string | null;
   truck_type: string;
-  status: "OPEN" | "DONE";
+  status: "OPEN" | "DONE" | "CANCELLED";
   created_at: string;
   worker_name?: string;
   shipments: Shipment[];
+  structure_version: number;
+  pallets: Pallet[];
   photos: Photo[];
 };
-export type Store = { code: string; name: string; active: boolean };
+export type Store = { code: string; name: string; active: boolean; memberships?: { group: string; category: string }[] };
 export type Identity = { id: string; name: string; role: string };
 export class ApiError extends Error {
   constructor(
@@ -105,8 +108,8 @@ export const sides = [
 export const truckTypes = [
   "4 ล้อ",
   "6 ล้อ",
-  "8 ล้อ",
+  "10 ล้อ",
   "12 ล้อ",
-  "เทรลเลอร์",
+  "รถเทรลเลอร์",
 ] as const;
 export const MAX_TRIP_PHOTOS = 120;

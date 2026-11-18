@@ -1,3 +1,4 @@
+import { useStoreRefresh } from "../../components/StorePicker";
 import { t, useLanguage, locale } from "../../lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -5,12 +6,12 @@ import {
   Plus,
   RefreshCw,
   Truck,
-  Camera,
   Send,
   CheckCircle2,
   WifiOff,
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
+import { TripPallets } from "../../components/TripPallets";
 import { PhotoTile } from "../../components/PhotoTile";
 import { TripPhotoChart } from "../../components/TripPhotoChart";
 import { CloseTripDialog } from "../../components/CloseTripDialog";
@@ -41,6 +42,7 @@ export function LoadingPage() {
   const navigate = useNavigate();
   const [who, setWho] = useState<Identity | null>(null);
   const [stores, setStores] = useState<Store[]>([]);
+  useStoreRefresh(setStores);
   const [provinces, setProvinces] = useState<{ name: string }[]>([]);
   const [province, setProvince] = useState(() => saved("province-draft"));
   const [jobs, setJobs] = useState<Trip[]>([]);
@@ -51,8 +53,6 @@ export function LoadingPage() {
       ? saved("truck-type-draft")
       : "",
   );
-  const [number, setNumber] = useState("");
-  const [store, setStore] = useState("");
   const [queue, setQueue] = useState<PendingPhoto[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -61,11 +61,11 @@ export function LoadingPage() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [online, setOnline] = useState(navigator.onLine);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [palletEditing, setPalletEditing] = useState(false);
   const syncingRef = useRef(false);
   const mounted = useRef(true);
   const currentId = useRef("");
-  const tripRequest = useRef(saved("trip-request") || uid());
-  const shipmentRequest = useRef(uid());
+  const tripRequest = useRef(uid());
   const captureLock = useRef(false);
   const actionLock = useRef(false);
   const pending = queue.filter((item) => item.tripId === trip?.id);
@@ -84,12 +84,14 @@ export function LoadingPage() {
     setSyncing(true);
     setError("");
     try {
+      const current = await refresh(id);
+      if (current.status !== "OPEN") return;
       const items = (await allPending()).filter((item) => item.tripId === id);
       for (const item of items) {
         const body = new FormData();
         body.append("file", item.blob, "trip.jpg");
         const path = item.photoId
-          ? `/trips/${id}/photos/${item.photoId}`
+          ? `/trips/${id}/photos/${item.photoId}${item.palletId && !item.side ? "?pallet_id=" + item.palletId : ""}`
           : `/trips/${id}/pallets/${item.palletId}/photos/${item.side}`;
         await api(path, {
           method: "PUT",
@@ -114,7 +116,7 @@ export function LoadingPage() {
         const identity = await api<Identity>("/worker/me");
         if (!active) return;
         setWho(identity);
-        tripRequest.current = saved("trip-request:" + identity.id) || uid();
+        tripRequest.current = saved("trip-request-v2:" + identity.id) || uid();
         const [storeList, jobList, provinceList] = await Promise.all([
           api<Store[]>("/stores"),
           api<Trip[]>("/trips"),
@@ -176,7 +178,7 @@ export function LoadingPage() {
       !provinces.some((item) => item.name === province.trim())
     )
       throw new Error(t("กรุณาเลือกจังหวัดป้ายทะเบียนจากรายการ"));
-    remember("trip-request:" + who?.id, tripRequest.current);
+    remember("trip-request-v2:" + who?.id, tripRequest.current);
     const created = await api<Trip>("/trips", {
       method: "POST",
       body: JSON.stringify({
@@ -184,8 +186,6 @@ export function LoadingPage() {
         truck_id: truck.trim(),
         truck_province: province.trim() || null,
         truck_type: truckType.trim(),
-        shipment_number: number.trim(),
-        store_code: store,
       }),
     });
     currentId.current = created.id;
@@ -193,22 +193,8 @@ export function LoadingPage() {
     remember("active-trip", created.id);
     setJobs(await api<Trip[]>("/trips"));
   }
-  async function addShipment() {
-    if (!trip) return;
-    const next = await api<Trip>(`/trips/${trip.id}/shipments`, {
-      method: "POST",
-      body: JSON.stringify({
-        id: shipmentRequest.current,
-        number: number.trim(),
-        store_code: store,
-      }),
-    });
-    setTrip(next);
-    setNumber("");
-    shipmentRequest.current = uid();
-  }
-  async function takePhotos(files: File[]) {
-    if (!trip || busy || syncing || captureLock.current) return;
+  async function takePhotos(files: File[], palletId?: string) {
+    if (!trip || trip.status !== "OPEN" || busy || syncing || captureLock.current) return;
     captureLock.current = true;
     setBusy(true);
     setError("");
@@ -224,7 +210,7 @@ export function LoadingPage() {
       if (trip.photos.length + alreadyQueued + files.length > MAX_TRIP_PHOTOS)
         throw new Error(t("รวมภาพที่รอส่งแล้ว ต้องไม่เกิน 120 ภาพต่อ Trip"));
       for (const file of files) {
-        await enqueue(trip.id, await compress(file));
+        await enqueue(trip.id, await compress(file), palletId);
         if (mounted.current) setQueue(await allPending());
       }
       setQueue(await allPending());
@@ -242,13 +228,11 @@ export function LoadingPage() {
     setTrip(null);
     remember("active-trip", "");
     tripRequest.current = uid();
-    remember("trip-request:" + who?.id, tripRequest.current);
+    remember("trip-request-v2:" + who?.id, tripRequest.current);
     setTruck("");
     setProvince("");
     remember("province-draft", "");
     setTruckType("");
-    setNumber("");
-    setStore("");
     remember("truck-draft", "");
     remember("truck-type-draft", "");
     setConfirmClose(false);
@@ -261,8 +245,15 @@ export function LoadingPage() {
   );
   const totalPhotos = photoCount + queuedOnly.length;
   const complete =
-    trip?.shipments.length === 1 && photoCount >= 1 && pending.length === 0;
-  const done = trip?.status === "DONE";
+    !!trip &&
+    !palletEditing &&
+    (trip.structure_version === 1
+      ? trip.shipments.length === 1
+      : trip.pallets.length > 0 && trip.pallets.every(pallet=>pallet.orders.length>0)) &&
+    photoCount >= 1 &&
+    pending.length === 0;
+  const cancelled = trip?.status === "CANCELLED";
+  const done = !!trip && trip.status !== "OPEN";
   const disabled = busy || syncing;
   if (loadFailed)
     return (
@@ -286,12 +277,32 @@ export function LoadingPage() {
   return (
     <>
       <div className="work-context">
+        <div className="work-context-row">
         <div className="worker-heading">
           <div className="worker-avatar">{who?.name.slice(0, 1)}</div>
           <div className="worker-name">
             <b>{who?.name}</b>
             <small>{t("ผู้ปฏิบัติงาน · โหลดสินค้า")}</small>
           </div>
+        </div>
+        {trip && (
+            <div className="trip-summary work-trip-tab">
+              <div>
+                <h2>
+                  <Truck size={19} />
+                  <span className="trip-registration">{trip.truck_id}</span>
+                  {trip.truck_province && <small>{trip.truck_province}</small>}
+                </h2>
+              </div>
+              <div className="trip-context-meta">
+                <span>{t(trip.truck_type)}</span>
+                <span>{trip.pallets.length} Pallet</span>
+              <span className={`status-badge ${done ? "done" : ""}`}>
+                {cancelled ? t("ยกเลิกแล้ว") : done ? t("ปิดงานแล้ว") : t("กำลังโหลดสินค้า")}
+              </span>
+              </div>
+            </div>
+        )}
         </div>
         <div className="work-steps" aria-label={t("ความคืบหน้าของเที่ยวรถ")}>
           <span
@@ -306,7 +317,7 @@ export function LoadingPage() {
             aria-current={trip && !done ? "step" : undefined}
           >
             <b>2</b>
-            {t("ภาพเที่ยวรถ")}
+            {t("Pallet และภาพ")}
           </span>
           <span
             className={done ? "current" : ""}
@@ -382,9 +393,7 @@ export function LoadingPage() {
               {t("ข้อมูลรถ")}
             </h2>
             <p className="client-hint">
-              {t(
-                "กรอกช่องสีเหลือง เลือกชนิดรถและ Store แล้วเริ่มถ่ายภาพ · จังหวัดไม่บังคับกรอก",
-              )}
+              {t("กรอกข้อมูลรถ แล้วเพิ่ม Pallet ในขั้นตอนถัดไป · จังหวัดไม่บังคับ")}
             </p>
             <div className="registration-row">
               <div className="registration-number-field">
@@ -454,126 +463,12 @@ export function LoadingPage() {
                 ))}
               </select>
             </label>
-            <label>
-              {t("ส่งไป Store")}
-              <select
-                required
-                value={store}
-                onChange={(event) => {
-                  setStore(event.target.value);
-                  shipmentRequest.current = uid();
-                }}
-              >
-                <option value="">{t("เลือก Store ปลายทาง")}</option>
-                {stores.map((item) => (
-                  <option key={item.code} value={item.code}>
-                    {item.code} · {item.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {!stores.length && (
-              <p className="error-box">
-                {t("ยังไม่มี Store กรุณาให้ Admin เพิ่ม Store ก่อนเริ่มงาน")}
-              </p>
-            )}
-            <label>
-              {t("เลข Shipment")}
-              <input
-                required
-                maxLength={80}
-                value={number}
-                className="required-entry"
-                autoCapitalize="characters"
-                onChange={(event) => {
-                  setNumber(event.target.value);
-                  shipmentRequest.current = uid();
-                }}
-                placeholder={t("สแกนหรือพิมพ์เลข Shipment")}
-              />
-            </label>
-            <p className="client-hint">{t("เลข Shipment ต้องไม่ซ้ำในระบบ")}</p>
-            <Button disabled={disabled || !online || !stores.length}>
-              {busy ? t("กำลังบันทึก…") : t("บันทึกข้อมูลและเริ่มถ่ายภาพ")}
+            <Button disabled={disabled || !online}>
+              {busy ? t("กำลังบันทึก…") : t("เริ่มเที่ยวรถ")}
             </Button>
           </form>
         ) : (
           <>
-            <div className="panel trip-summary">
-              <div>
-                <h2>
-                  <Truck size={19} />
-                  {trip.truck_id} {trip.truck_province}
-                </h2>
-                <p>
-                  {trip.truck_type} · {trip.shipments.length} Shipment
-                </p>
-              </div>
-              <span className={`status-badge ${done ? "done" : ""}`}>
-                {done ? t("ปิดงานแล้ว") : t("กำลังโหลดสินค้า")}
-              </span>
-            </div>
-            {!done && trip.shipments.length === 0 && (
-              <form
-                className="panel client-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void action(addShipment);
-                }}
-              >
-                <h2 className="section-heading">
-                  <span>1</span>
-                  {t("เพิ่ม Shipment")}
-                </h2>
-                <label>
-                  {t("ส่งไป Store")}
-                  <select
-                    required
-                    value={store}
-                    onChange={(event) => {
-                      setStore(event.target.value);
-                      shipmentRequest.current = uid();
-                    }}
-                  >
-                    <option value="">{t("เลือก Store ปลายทาง")}</option>
-                    {stores.map((item) => (
-                      <option key={item.code} value={item.code}>
-                        {item.code} · {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {!stores.length && (
-                  <p className="error-box">
-                    {t(
-                      "ยังไม่มี Store กรุณาให้ Admin เพิ่ม Store ก่อนเริ่มงาน",
-                    )}
-                  </p>
-                )}
-                <label>
-                  {t("เลข Shipment")}
-                  <input
-                    required
-                    maxLength={80}
-                    value={number}
-                    className="required-entry"
-                    autoCapitalize="characters"
-                    onChange={(event) => {
-                      setNumber(event.target.value);
-                      shipmentRequest.current = uid();
-                    }}
-                    placeholder={t("สแกนหรือพิมพ์เลข Shipment")}
-                  />
-                </label>
-                <p className="client-hint">
-                  {t("เลข Shipment ต้องไม่ซ้ำในระบบ")}
-                </p>
-                <Button disabled={disabled || !stores.length || !online}>
-                  <Plus size={18} />
-                  {t("เพิ่ม Shipment")}
-                </Button>
-              </form>
-            )}
             {trip.shipments.map((shipment) => (
               <div className="panel shipment-panel" key={shipment.id}>
                 <h2>{shipment.number}</h2>
@@ -582,92 +477,69 @@ export function LoadingPage() {
                 </p>
               </div>
             ))}
+            <TripPallets
+              key={trip.id}
+              onEditingChange={setPalletEditing}
+              trip={trip}
+              stores={stores}
+              disabled={disabled}
+              canCapture={totalPhotos < MAX_TRIP_PHOTOS}
+              pending={pending}
+              onUpdated={setTrip}
+              onCapture={(files, palletId) => void takePhotos(files, palletId)}
+              onDiscard={(item) => {
+                if (window.confirm("ลบภาพนี้ออกจากคิวรอส่งในเครื่อง?"))
+                  void action(async () => {
+                    await acknowledge(item);
+                    setQueue(await allPending());
+                  });
+              }}
+            />
+            {(trip.photos.some((photo) => !photo.pallet_id) || queuedOnly.some((item) => !item.palletId)) && (
             <div className="panel">
               <h2 className="section-heading">
                 <span>2</span>
-                {t("ภาพสินค้าในเที่ยวรถ")}
+                {t("ภาพรวม Trip")}
               </h2>
-              <TripPhotoChart sent={photoCount} pending={queuedOnly.length} />
-              {!done && (
-                <p className="client-hint">
-                  {t(
-                    "ถ่ายภาพให้เห็นสินค้าชัดเจน ระบบส่งภาพอัตโนมัติ เมื่อภาพส่งครบแล้วให้ตรวจสอบและปิดเที่ยวรถ",
-                  )}
-                </p>
-              )}
-              {!done && (
-                <div className="trip-capture-actions">
-                  <label className="camera-button">
-                    <Camera size={24} />
-                    <span>{t("ถ่ายภาพสินค้า")}</span>
-                    <input
-                      disabled={disabled || totalPhotos >= MAX_TRIP_PHOTOS}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      capture="environment"
-                      aria-label={t("ถ่ายภาพสินค้า")}
-                      onChange={(event) => {
-                        const files = Array.from(event.target.files || []);
-                        event.target.value = "";
-                        if (files.length) void takePhotos(files);
-                      }}
-                    />
-                  </label>
-                  <label className="camera-button gallery-button">
-                    <Plus size={20} />
-                    <span>{t("เลือกภาพจากเครื่อง")}</span>
-                    <input
-                      disabled={disabled || totalPhotos >= MAX_TRIP_PHOTOS}
-                      type="file"
-                      multiple
-                      accept="image/jpeg,image/png,image/webp"
-                      aria-label={t("เลือกภาพจากเครื่อง")}
-                      onChange={(event) => {
-                        const files = Array.from(event.target.files || []);
-                        event.target.value = "";
-                        if (files.length) void takePhotos(files);
-                      }}
-                    />
-                  </label>
-                </div>
-              )}
               <div className="capture-grid">
-                {trip.photos.map((photo, index) => (
-                  <PhotoTile
-                    key={photo.id}
-                    label={t("ภาพที่ {0}", index + 1)}
-                    photo={photo}
-                    disabled
-                    onCapture={() => {}}
-                  />
-                ))}
-                {queuedOnly.map((item, index) => (
-                  <div key={item.key}>
+                {trip.photos
+                  .filter((photo) => !photo.pallet_id)
+                  .map((photo, index) => (
                     <PhotoTile
-                      label={t("รอส่ง ") + (index + 1)}
-                      pending={item}
+                      key={photo.id}
+                      label={t("ภาพที่ {0}", index + 1)}
+                      photo={photo}
                       disabled
                       onCapture={() => {}}
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="full-width"
-                      disabled={disabled}
-                      onClick={() => {
-                        if (
-                          window.confirm(t("ลบภาพนี้ออกจากคิวรอส่งในเครื่อง?"))
-                        )
-                          void action(async () => {
-                            await acknowledge(item);
-                            setQueue(await allPending());
-                          });
-                      }}
-                    >
-                      {t("ลบภาพรอส่ง")}
-                    </Button>
-                  </div>
-                ))}
+                  ))}
+                {queuedOnly
+                  .filter((item) => !item.palletId)
+                  .map((item, index) => (
+                    <div key={item.key}>
+                      <PhotoTile
+                        label={t("รอส่ง ") + (index + 1)}
+                        pending={item}
+                        disabled
+                        onCapture={() => {}}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="full-width"
+                        disabled={disabled}
+                        onClick={() => {
+                          if (window.confirm(t("ลบภาพนี้ออกจากคิวรอส่งในเครื่อง?")))
+                            void action(async () => {
+                              await acknowledge(item);
+                              setQueue(await allPending());
+                            });
+                        }}
+                      >
+                        {t("ลบภาพรอส่ง")}
+                      </Button>
+                    </div>
+                  ))}
               </div>
               {totalPhotos >= MAX_TRIP_PHOTOS && (
                 <p className="notice">
@@ -675,10 +547,11 @@ export function LoadingPage() {
                 </p>
               )}
             </div>
+            )}
             <div className="panel upload-summary">
               <h2 className="section-heading">
                 <span>3</span>
-                {done ? t("บันทึกสำเร็จ") : t("ตรวจสอบและส่งข้อมูล")}
+                {cancelled ? t("ยกเลิกแล้ว") : done ? t("บันทึกสำเร็จ") : t("ตรวจสอบและส่งข้อมูล")}
               </h2>
               {pending.length > 0 && (
                 <p>
@@ -693,12 +566,10 @@ export function LoadingPage() {
                   onClick={() => void sync(trip.id)}
                 >
                   <RefreshCw size={17} />
-                  {syncing
-                    ? t("กำลังส่งภาพ…")
-                    : t("ตรวจสอบ / ส่งภาพที่ค้างใหม่")}
+                  {syncing ? t("กำลังส่งภาพ…") : t("ตรวจสอบ / ส่งภาพที่ค้างใหม่")}
                 </Button>
               )}
-              {done && (
+              {done && !cancelled && (
                 <p className="success-text">
                   <CheckCircle2 size={18} />{" "}
                   {t("ข้อมูลและภาพถูกบันทึกบนเซิร์ฟเวอร์แล้ว")}
@@ -729,6 +600,8 @@ export function LoadingPage() {
               />
             )}
             <div className="work-footer">
+              <div className="work-footer-actions">
+              <TripPhotoChart sent={photoCount} pending={queuedOnly.length} />
               {done ? (
                 <Button className="full-width" onClick={newTrip}>
                   <Plus size={18} />
@@ -744,11 +617,10 @@ export function LoadingPage() {
                   {syncing ? t("กำลังส่งภาพ…") : t("ตรวจสอบและปิดเที่ยวรถ")}
                 </Button>
               )}
+              </div>
               {!complete && !done && (
                 <small>
-                  {t(
-                    "ต้องมี Shipment และส่งภาพอย่างน้อย 1 ภาพ พร้อมส่งคิวที่ค้างให้ครบ",
-                  )}
+                  {t("กรอก Order ให้ทุก Pallet และส่งภาพที่ค้างให้ครบก่อนปิดเที่ยวรถ")}
                 </small>
               )}
             </div>

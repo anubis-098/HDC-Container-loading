@@ -37,7 +37,7 @@ export async function allPending(): Promise<PendingPhoto[]> {
     };
   });
 }
-export async function enqueue(tripId: string, blob: Blob) {
+export async function enqueue(tripId: string, blob: Blob, palletId?: string) {
   const db = await database();
   const photoId = uid();
   const item: PendingPhoto = {
@@ -45,6 +45,7 @@ export async function enqueue(tripId: string, blob: Blob) {
     version: uid(),
     tripId,
     photoId,
+    palletId,
     blob,
   };
   return new Promise<void>((resolve, reject) => {

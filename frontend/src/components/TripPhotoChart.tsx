@@ -1,4 +1,4 @@
-import { t, useLanguage, locale } from "../lib/i18n";
+import { t, useLanguage } from "../lib/i18n";
 import { MAX_TRIP_PHOTOS } from "../lib/api";
 
 export function TripPhotoChart({
@@ -52,38 +52,8 @@ export function TripPhotoChart({
         </svg>
         <div className="photo-ring-label" aria-hidden="true">
           <strong>{total}</strong>
-          <span>
-            / {MAX_TRIP_PHOTOS}
-            {t("ภาพ")}
-          </span>
+          <span>/ {MAX_TRIP_PHOTOS}</span>
         </div>
-      </div>
-      <div className="photo-chart-details">
-        <h3>{t("ภาพในเที่ยวรถ")}</h3>
-        <dl>
-          <div>
-            <dt>
-              <i className="photo-dot-sent" />
-              {t("ส่งสำเร็จ")}
-            </dt>
-            <dd>{sent}</dd>
-          </div>
-          <div>
-            <dt>
-              <i className="photo-dot-pending" />
-              {t("รอส่ง")}
-            </dt>
-            <dd>{pending}</dd>
-          </div>
-          <div>
-            <dt>
-              <i className="photo-dot-remaining" />
-              {t("เพิ่มได้อีก")}
-            </dt>
-            <dd>{remaining}</dd>
-          </div>
-        </dl>
-        <small>{t("อย่างน้อย 1 ภาพเพื่อปิดงาน")}</small>
       </div>
     </div>
   );

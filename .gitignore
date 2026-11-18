@@ -10,4 +10,14 @@ __pycache__/
 00000.jpeg
 example_index.html
 .pytest_cache/
+backups/
+tmp/
+frontend/vite.pallet-preview.config.ts
 *.log
+.secrets/
+*.key
+*.pem
+*.dump
+*.backup
+*.sqlite*
+~$*

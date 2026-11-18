@@ -6,4 +6,4 @@ RUN pip install --no-cache-dir -r requirements.txt -r requirements-test.txt
 COPY app ./app
 COPY migrations ./migrations
 COPY tests ./tests
-CMD ["sh", "-c", "python -m app.migrate && pytest -q tests"]
+CMD ["sh", "-c", "python -m app.migrate && python -m pytest -q tests"]

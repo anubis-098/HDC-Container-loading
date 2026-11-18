@@ -923,38 +923,14 @@ td small {
 }
 .close-trip-actions button { min-height: 44px; }
 
-.trip-photo-chart {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  margin: 12px 0 16px;
-  padding: 16px;
-  border: 1px solid #e2ecf3;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #f1f8fc, #fafcfe);
-}
-.trip-photo-ring { position: relative; width: 124px; height: 124px; flex: 0 0 124px; }
+/* Compact photo counter in the fixed trip action bar. */
+.trip-photo-chart { flex: 0 0 58px; }
+.trip-photo-ring { position: relative; width: 58px; height: 58px; }
 .trip-photo-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-.trip-photo-ring circle { fill: none; stroke-width: 10; }
+.trip-photo-ring circle { fill: none; stroke-width: 14; }
 .photo-ring-track { stroke: #dfe7ee; }
 .photo-ring-sent { stroke: #0080c6; }
 .photo-ring-pending { stroke: #ec8922; }
-.photo-ring-label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.photo-ring-label strong { font-size: 32px; line-height: 1.15; color: #006da8; font-variant-numeric: tabular-nums; }
-.photo-ring-label span { font-size: 12px; color: #63758b; }
-.photo-chart-details { flex: 1; min-width: 0; }
-.photo-chart-details h3 { font-size: 14px; font-weight: 700; margin: 0 0 6px; }
-.photo-chart-details dl { margin: 0; display: grid; gap: 4px; font-size: 13px; }
-.photo-chart-details dl > div { display: flex; justify-content: space-between; gap: 12px; }
-.photo-chart-details dt { display: flex; align-items: center; gap: 7px; }
-.photo-chart-details dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
-.photo-chart-details i { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.photo-dot-sent { background: #0080c6; }
-.photo-dot-pending { background: #ec8922; }
-.photo-dot-remaining { background: #dfe7ee; border: 1px solid #b9c8d5; }
-.photo-chart-details small { display: block; margin-top: 8px; font-size: 11px; color: #63758b; }
-@media (max-width: 380px) {
-  .trip-photo-chart { gap: 12px; padding: 12px 10px; }
-  .trip-photo-ring { width: 104px; height: 104px; flex-basis: 104px; }
-  .photo-ring-label strong { font-size: 28px; }
-}
+.photo-ring-label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
+.photo-ring-label strong { font-size: 18px; line-height: 1.1; color: #006da8; }
+.photo-ring-label span { font-size: 10px; line-height: 1.2; color: #63758b; }

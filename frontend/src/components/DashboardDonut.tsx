@@ -1,10 +1,11 @@
 import { useLanguage, locale } from '../lib/i18n';
 import '../styles/dashboard-donut.css';
 
-export function DashboardDonut({ open, done }: { open: number; done: number }) {
+export function DashboardDonut({ open, done, cancelled = 0 }: { open: number; done: number; cancelled?: number }) {
   const en = useLanguage() === 'en';
-  const total = open + done;
+  const total = open + done + cancelled;
   const segments = [
+    { label: en ? 'Cancelled' : 'ยกเลิกแล้ว', count: cancelled, color: '#8b98a5' },
     { label: en ? 'In progress' : 'กำลังดำเนินการ', count: open, color: '#d99016' },
     { label: en ? 'Completed' : 'ปิดงานแล้ว', count: done, color: '#0080c6' },
   ];

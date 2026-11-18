@@ -5,12 +5,15 @@ import { Download, RefreshCw, Search } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { DashboardDonut } from "../components/DashboardDonut";
 import { api, message, type Trip } from "../lib/api";
-type Row = Trip & { shipment_count: number; photo_count: number };
+import { tripCsv } from "../lib/tripCsv";
+type Row = Trip & { shipment_count: number; pallet_count: number; photo_count: number };
 type Summary = {
   trips: number;
   open: number;
   done: number;
+  cancelled: number;
   shipments: number;
+  pallets: number;
   photos: number;
 };
 export function DashboardPage() {
@@ -52,74 +55,38 @@ export function DashboardPage() {
       active = false;
     };
   }, [query, offset, reload]);
-  function exportCsv() {
-    const cell = (v: unknown) =>
-      '"' +
-      String(v ?? "")
-        .replace(/^[=+@-]/, "'$&")
-        .replaceAll('"', '""') +
-      '"';
-    const lines = [
-      [
-        "Truck ID",
-        t("จังหวัดป้ายทะเบียน"),
-        "Truck Type",
-        t("ผู้บันทึก"),
-        t("สถานะ"),
-        "Shipment",
-        "Photos",
-        t("เวลาสร้าง"),
-      ],
-      ...rows.filter(row => !selected.length || selected.includes(row.id)).map((row) => [
-        row.truck_id,
-        row.truck_province,
-        row.truck_type,
-        row.worker_name,
-        row.status,
-        row.shipment_count,
-        row.photo_count,
-        row.created_at,
-      ]),
-    ];
-    const url = URL.createObjectURL(
-      new Blob(
-        ["\ufeff" + lines.map((line) => line.map(cell).join(",")).join("\r\n")],
-        { type: "text/csv;charset=utf-8" },
-      ),
-    );
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "container-loading-current-page.csv";
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  async function exportCsv() {
+    setActionBusy(true);
+    setError("");
+    try {
+      const chosen = rows.filter(row => !selected.length || selected.includes(row.id));
+      const trips: Trip[] = [];
+      for (let index = 0; index < chosen.length; index += 5) {
+        const batch = await Promise.all(chosen.slice(index, index + 5).map(async row => ({
+          ...await api<Trip>(`/trips/${row.id}`), worker_name: row.worker_name,
+        })));
+        trips.push(...batch);
+      }
+      const url = URL.createObjectURL(new Blob([tripCsv(trips)], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = selected.length ? "container-loading-selected.csv" : "container-loading-current-page.csv";
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      setError(message(error));
+    } finally {
+      setActionBusy(false);
+    }
   }
+
   return (
     <section>
       <h1>Dashboard</h1>
-      <div className="table-tools">
-        <Button disabled={busy || !selected.length || actionBusy} onClick={async () => {
-          setActionBusy(true); setError('');
-          try {
-            const response = await fetch('/api/admin/trips/photos.zip', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify(selected)});
-            if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(body.detail || 'Download failed'); }
-            const url = URL.createObjectURL(await response.blob());
-            const link = document.createElement('a'); link.href=url; link.download='container-loading-photos.zip'; link.click();
-            setTimeout(() => URL.revokeObjectURL(url),1000);
-          } catch(error) { setError(message(error)); }
-          finally { setActionBusy(false); }
-        }}><Download size={16}/>ดาวน์โหลดรูปที่เลือก ({selected.length})</Button>
-        <Button disabled={!selected.length || actionBusy} onClick={exportCsv}>{t("ดาวน์โหลดที่เลือก")} ({selected.length}) CSV</Button>
-        <Button disabled={!selected.length || actionBusy} onClick={async () => {
-          if (!window.confirm(t("ยืนยันลบรายการที่เลือกและภาพทั้งหมด?"))) return;
-          setActionBusy(true);
-          try { for (const id of selected) { await api(`/admin/trips/${id}`, {method:"DELETE"}); setSelected(values => values.filter(value => value !== id)); } }
-          catch (error) { setError(message(error)); }
-          finally { setActionBusy(false); setReload(value => value + 1); }
-        }}>{t("ลบที่เลือก")}</Button>
-      </div>
+
       <p>{t("ภาพรวมการโหลดสินค้าและภาพรวมของแต่ละเที่ยวรถ")}</p>
       {summary && (
-        <DashboardDonut open={summary.open} done={summary.done}/>
+        <DashboardDonut open={summary.open} done={summary.done} cancelled={summary.cancelled}/>
       )}
       {summary && (
         <div className="stats-grid">
@@ -127,7 +94,7 @@ export function DashboardPage() {
             [t("เที่ยวรถทั้งหมด"), summary.trips],
             [t("งานค้าง"), summary.open],
             [t("ปิดงานแล้ว"), summary.done],
-            ["Shipment", summary.shipments],
+            ["Pallet", summary.pallets],
             [t("ภาพทั้งหมด"), summary.photos],
           ].map(([label, value]) => (
             <div className="stat-card" key={label}>
@@ -150,7 +117,7 @@ export function DashboardPage() {
           <input
             aria-label={t("ค้นหาเที่ยวรถ")}
             maxLength={100}
-            placeholder="Truck ID / Shipment / Store"
+            placeholder="????????? / Order / Store"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -169,13 +136,34 @@ export function DashboardPage() {
           <Button
             type="button"
             variant="outline"
-            disabled={!rows.length || busy}
+            disabled={!rows.length || busy || actionBusy}
             onClick={exportCsv}
           >
             <Download size={16} />
             {t("CSV หน้านี้")}
           </Button>
         </form>
+        <div className="table-tools">
+          <Button disabled={busy || !selected.length || actionBusy} onClick={async () => {
+            setActionBusy(true); setError('');
+            try {
+              const response = await fetch('/api/admin/trips/photos.zip', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify(selected)});
+              if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(body.detail || 'Download failed'); }
+              const url = URL.createObjectURL(await response.blob());
+              const link = document.createElement('a'); link.href=url; link.download='container-loading-photos.zip'; link.click();
+              setTimeout(() => URL.revokeObjectURL(url),1000);
+            } catch(error) { setError(message(error)); }
+            finally { setActionBusy(false); }
+          }}><Download size={16}/>ดาวน์โหลดรูปที่เลือก ({selected.length})</Button>
+          <Button disabled={!selected.length || actionBusy} onClick={exportCsv}>{t("ดาวน์โหลดที่เลือก")} ({selected.length}) CSV</Button>
+          <Button disabled={!selected.length || actionBusy} onClick={async () => {
+            if (!window.confirm(t("ยืนยันลบรายการที่เลือกและภาพทั้งหมด?"))) return;
+            setActionBusy(true);
+            try { for (const id of selected) { await api(`/admin/trips/${id}`, {method:"DELETE"}); setSelected(values => values.filter(value => value !== id)); } }
+            catch (error) { setError(message(error)); }
+            finally { setActionBusy(false); setReload(value => value + 1); }
+          }}>{t("ลบที่เลือก")}</Button>
+        </div>
         {error && (
           <p className="error-box" role="alert">
             {t(error)}
@@ -190,10 +178,10 @@ export function DashboardPage() {
                 <tr><th><input type="checkbox" aria-label={t("เลือกทั้งหมดในหน้านี้")} disabled={actionBusy || !rows.length} checked={rows.length > 0 && selected.length === rows.length} onChange={e => setSelected(e.target.checked ? rows.map(row => row.id) : [])} /></th>
                   <th>{t("ทะเบียนรถ")}</th>
                   <th>{t("ผู้บันทึก")}</th>
-                  <th>Shipment</th>
+                  <th>Pallet</th>
                   <th>Photos</th>
                   <th>{t("สถานะ")}</th>
-                  <th>{t("วันที่")}</th>
+                  <th>{t("วันที่")}</th><th></th>
                 </tr>
               </thead>
               <tbody>
@@ -206,16 +194,23 @@ export function DashboardPage() {
                       <small>{row.truck_type}</small>
                     </td>
                     <td>{row.worker_name}</td>
-                    <td>{row.shipment_count}</td>
+                    <td>{row.pallet_count}</td>
                     <td>{row.photo_count}</td>
                     <td>
                       <span
-                        className={`status-badge ${row.status === "DONE" ? "done" : ""}`}
+                        className={`status-badge ${row.status === "CANCELLED" ? "cancelled" : row.status === "DONE" ? "done" : ""}`}
                       >
-                        {row.status === "DONE" ? t("ปิดงานแล้ว") : t("งานค้าง")}
+                        {row.status === "CANCELLED" ? "ยกเลิกแล้ว" : row.status === "DONE" ? t("ปิดงานแล้ว") : t("งานค้าง")}
                       </span>
                     </td>
                     <td>{new Date(row.created_at).toLocaleString(locale())}</td>
+                    <td>{row.status === "OPEN" && <Button variant="outline" disabled={actionBusy} onClick={async () => {
+                      if (!window.confirm(`ยกเลิกงานค้างทะเบียน ${row.truck_id}? ข้อมูลและรูปภาพจะยังคงอยู่`)) return;
+                      setActionBusy(true); setError("");
+                      try { await api(`/admin/trips/${row.id}/cancel`, {method:"POST"}); setReload(value => value + 1); }
+                      catch (error) { setError(message(error)); }
+                      finally { setActionBusy(false); }
+                    }}>ยกเลิกงานค้าง</Button>}</td>
                   </tr>
                 ))}
               </tbody>

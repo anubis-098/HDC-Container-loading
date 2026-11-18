@@ -1,0 +1,132 @@
+.pallet-section {
+  display: grid;
+  gap: 14px;
+}
+.pallet-heading,
+.pallet-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pallet-heading h2,
+.pallet-card h3 {
+  margin: 0;
+}
+.pallet-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  background: #eaf5fd;
+  color: #006da8;
+  font-size: 13px;
+  border-radius: 50%;
+  margin-left: 7px;
+}
+.pallet-card h3 {
+  font-size: 19px;
+  color: #006da8;
+}
+.pallet-card-top p {
+  font-size: 14px;
+  margin: 6px 0;
+}
+.order-tags {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.order-tags span {
+  max-width: 100%;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+  padding: 7px 12px;
+  border: 1px solid #bad6e9;
+  border-radius: 6px;
+  background: #f1f7fc;
+  color: #005b8d;
+  overflow-wrap: anywhere;
+}
+.order-tags small {
+  color: #718699;
+}
+.order-input-row {
+  display: flex;
+  gap: 8px;
+}
+.order-input-row input {
+  flex: 1;
+  min-width: 0;
+}
+.client-surface .client-form .order-input-row input {
+  font-size: 20px;
+  font-weight: 700;
+}
+.client-surface .client-form .order-input-row input::placeholder {
+  font-size: 14px;
+  font-weight: 400;
+}
+.order-remove {
+  width: 44px;
+  min-height: 44px;
+  border: 1px solid #dce7ef;
+  background: white;
+  border-radius: 8px;
+  color: #b02f42;
+  font-size: 23px;
+}
+.pallet-orders-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+.pallet-orders-label small {
+  font-size: 11px;
+  font-weight: 400;
+  margin-left: 8px;
+  color: #718699;
+}
+.pallet-form-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.pallet-editor select:required {
+  background: #fff4bf;
+}
+.pallet-photo-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #e5edf3;
+  padding-top: 12px;
+  margin-top: 14px;
+  font-size: 13px;
+}
+.pallet-card .capture-grid:empty {
+  display: none;
+}
+.pallet-card .trip-capture-actions {
+  margin-top: 12px;
+}
+.pallet-card .camera-button {
+  font-size: 14px;
+}
+.pallet-card .panel {
+  margin: 0;
+}
+.pallet-heading {
+  margin-bottom: 0;
+}
+@media (max-width: 480px) {
+  .pallet-card-top {
+    align-items: flex-start;
+  }
+  .pallet-card-top > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}

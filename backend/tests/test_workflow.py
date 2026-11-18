@@ -18,7 +18,7 @@ def isolated_database():
     with connect() as conn:
         conn.execute('TRUNCATE workers,admins,sessions,stores,trips,shipments,pallets,photos,audit_log CASCADE')
         conn.execute('INSERT INTO admins(id,username,password_hash) VALUES (%s,%s,%s)', (uuid4(),'admin',password_hash(' test-password-123 ')))
-        conn.execute("INSERT INTO stores VALUES ('1001','Test Store',true)")
+        conn.execute("INSERT INTO stores(code,name,active) VALUES ('1001','Test Store',true)")
     with connect(True) as conn:
         conn.execute('TRUNCATE photo_blobs')
     _login_attempts.clear()
@@ -205,7 +205,7 @@ def test_migration_preserves_legacy_photo_reference():
             migrations=Path(__file__).resolve().parent.parent/'migrations'/'app'
             conn.execute((migrations/'001_initial.sql').read_text(encoding='utf-8-sig'))
             conn.execute('INSERT INTO workers(id,name) VALUES (%s,%s)',(worker_id,'Legacy Worker'))
-            conn.execute("INSERT INTO stores VALUES ('S1','Legacy Store',true)")
+            conn.execute("INSERT INTO stores(code,name,active) VALUES ('S1','Legacy Store',true)")
             conn.execute('INSERT INTO trips(id,worker_id,truck_id,truck_type) VALUES (%s,%s,%s,%s)',(trip_id,worker_id,'70-1234','old custom type'))
             conn.execute("INSERT INTO shipments VALUES (%s,%s,'OLD-SHIP','S1','Legacy Store')",(shipment_id,trip_id))
             conn.execute('INSERT INTO pallets VALUES (%s,%s,1)',(pallet_id,shipment_id))
@@ -216,6 +216,13 @@ def test_migration_preserves_legacy_photo_reference():
             assert photo['pallet_id']==pallet_id
             assert photo['sha256']=='a'*64
             assert conn.execute('SELECT truck_type FROM trips').fetchone()['truck_type']=='old custom type'
+            conn.execute((migrations/'006_trip_pallet_orders.sql').read_text(encoding='utf-8-sig'))
+            migrated=conn.execute('SELECT * FROM pallets WHERE id=%s',(pallet_id,)).fetchone()
+            assert migrated['trip_id']==trip_id and migrated['shipment_id']==shipment_id
+            assert migrated['store_code']=='S1' and migrated['store_name']=='Legacy Store'
+            assert conn.execute('SELECT structure_version FROM trips').fetchone()['structure_version']==1
+            assert conn.execute('SELECT count(*) AS n FROM pallet_orders').fetchone()['n']==0
+            assert conn.execute('SELECT pallet_id FROM photos WHERE id=%s',(photo_id,)).fetchone()['pallet_id']==pallet_id
         finally:
             conn.rollback()
 
