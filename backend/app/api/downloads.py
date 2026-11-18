@@ -1,9 +1,11 @@
 import hashlib
 import json
+import re
 from pathlib import Path
 from tempfile import TemporaryFile
 from uuid import UUID
 from zipfile import ZipFile, ZIP_STORED, BadZipFile
+from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
@@ -20,19 +22,42 @@ def pallet_manifest(conn, trip, photos):
         {**p,'id':str(p['id']),'orders':[o['order_number'] for o in orders if o['pallet_id']==p['id']]} for p in pallets],
         'photos':[{'id':str(p['id']),'pallet_id':str(p['pallet_id']) if p['pallet_id'] else None} for p in photos]}
 
-def scoped_photo_path(manifest, row, index):
+def safe_folder(value):
+    raw = str(value)
+    name = re.sub(r'[\\/:*?"<>|\x00-\x1f]', '-', raw).strip(' .')[:100].rstrip(' .')
+    reserved = re.fullmatch(r'(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?', name, re.IGNORECASE)
+    if not name or reserved:
+        name = '_' + (name or 'unknown')
+    if name != raw:
+        name += '-' + hashlib.sha256(raw.encode('utf-8')).hexdigest()[:8]
+    return name
+
+
+def scoped_photo_paths(manifest, row, index):
+    day = row['uploaded_at'].astimezone(ZoneInfo('Asia/Bangkok')).strftime('%d%m%Y')
+    filename = f"{index:03d}-{row['id']}_{day}.jpg"
     pallet = next((p for p in manifest['pallets'] if p['id']==str(row['pallet_id'])), None)
-    folder = f"Pallet-{pallet['number']:03d}-{pallet['id'][:8]}" if pallet else 'Trip-overview'
-    return f"{folder}/{index:03d}-{row['id']}.jpg"
+    if not pallet:
+        return [f'Trip-overview/{filename}']
+    folder = f"Pallet-{pallet['number']:03d}"
+    # Legacy Shipments can each have a Pallet numbered 1 in the same Trip.
+    if sum(p['number']==pallet['number'] for p in manifest['pallets']) > 1:
+        folder += '-' + pallet['id']
+    if not pallet['orders']:
+        return [f'{folder}/No-Order/{filename}']
+    names = [safe_folder(order) for order in pallet['orders']]
+    paths = []
+    for order, name in zip(pallet['orders'], names):
+        # Prevent separate Order numbers from merging on case-insensitive filesystems.
+        if sum(other.casefold()==name.casefold() for other in names)>1:
+            name += '-' + hashlib.sha256(order.encode('utf-8')).hexdigest()[:8]
+        paths.append(f'{folder}/{name}/{filename}')
+    return paths
 
 @router.post('/photos.zip')
 def download_selected_photos(ids: list[UUID], who=Depends(admin)):
-    import re
-    from zoneinfo import ZoneInfo
     if not ids or len(ids) > 50:
         raise HTTPException(422, 'Select 1-50 trips')
-    def safe(value):
-        return re.sub(r'[\\/:*?"<>|\x00-\x1f]', '-', str(value)).strip(' .')[:100] or 'unknown'
     output = TemporaryFile()
     try:
         with connect() as conn, ZipFile(output, 'w', ZIP_STORED) as archive:
@@ -40,28 +65,14 @@ def download_selected_photos(ids: list[UUID], who=Depends(admin)):
             for trip_id in sorted(set(ids)):
                 trip = trip_access(conn, trip_id, who)
                 conn.execute('SELECT id FROM trips WHERE id=%s FOR SHARE', (trip_id,))
-                shipments = conn.execute('SELECT number FROM shipments WHERE trip_id=%s ORDER BY number', (trip_id,)).fetchall()
                 rows = conn.execute('SELECT * FROM photos WHERE trip_id=%s ORDER BY uploaded_at,id FOR SHARE', (trip_id,)).fetchall()
-                if trip['structure_version']==2:
-                    manifest = pallet_manifest(conn, trip, rows)
-                    base = f"Trip-{safe(trip['truck_id'])}-{trip_id}"
-                    archive.writestr(base+'/manifest.json',json.dumps(manifest,ensure_ascii=False))
-                    for index,row in enumerate(rows,1):
-                        archive.writestr(base+'/'+scoped_photo_path(manifest,row,index), image_bytes(row))
-                        count += 1
-                    continue
-                for row in rows:
-                    numbers = []
-                    if row.get('pallet_id'):
-                        shipment = conn.execute('SELECT s.number FROM shipments s JOIN pallets p ON p.shipment_id=s.id WHERE p.id=%s', (row['pallet_id'],)).fetchone()
-                        if shipment: numbers = [shipment['number']]
-                    if not numbers: numbers = [s['number'] for s in shipments] or ['NO-SHIPMENT']
-                    day = row['uploaded_at'].astimezone(ZoneInfo('Asia/Bangkok')).strftime('%Y%m%d')
-                    # Trip-level images belong to every Shipment on the trip.
+                manifest = pallet_manifest(conn, trip, rows)
+                base = f"Trip-{safe_folder(trip['truck_id'])}-{trip_id}"
+                archive.writestr(base+'/manifest.json',json.dumps(manifest,ensure_ascii=False))
+                for index,row in enumerate(rows,1):
                     content = image_bytes(row)
-                    for number in numbers:
-                        base = f"{safe(number)}_{safe(trip['truck_id'])}_{day}"
-                        archive.writestr(f"{base}/{base}_{row['id']}.jpg", content)
+                    for path in scoped_photo_paths(manifest, row, index):
+                        archive.writestr(base+'/'+path, content)
                         count += 1
             if not count: raise HTTPException(404, 'No photos in selected trips')
         size = output.tell()
@@ -114,11 +125,12 @@ def download_trip(trip_id: UUID, who=Depends(admin)):
                 raise HTTPException(404, 'เที่ยวรถนี้ยังไม่มีภาพ')
             # Verify all images before sending any ZIP bytes. Never silently omit failures.
             with ZipFile(output, 'w', ZIP_STORED) as archive:
-                manifest = pallet_manifest(conn, trip_access(conn, trip_id, who), rows) if trip_access(conn, trip_id, who)['structure_version']==2 else None
-                if manifest:
-                    archive.writestr('manifest.json',json.dumps(manifest,ensure_ascii=False))
+                manifest = pallet_manifest(conn, trip_access(conn, trip_id, who), rows)
+                archive.writestr('manifest.json',json.dumps(manifest,ensure_ascii=False))
                 for index,row in enumerate(rows,1):
-                    archive.writestr(scoped_photo_path(manifest,row,index) if manifest else f"{index:03d}-{row['id']}.jpg", image_bytes(row))
+                    content = image_bytes(row)
+                    for path in scoped_photo_paths(manifest,row,index):
+                        archive.writestr(path, content)
         size=output.tell()
         output.seek(0)
     except BaseException:

@@ -43,29 +43,30 @@ export async function api<T>(
   const headers = new Headers(options.headers);
   if (options.body && !(options.body instanceof FormData))
     headers.set("Content-Type", "application/json");
-  let response: Response;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.body instanceof FormData ? 90000 : 30000);
+  const abort = () => controller.abort();
+  if (options.signal?.aborted) controller.abort();
+  options.signal?.addEventListener("abort", abort, { once: true });
   try {
-    response = await fetch("/api" + path, {
-      ...options,
-      headers,
-      credentials: "same-origin",
-    });
-  } catch {
-    throw new ApiError(
-      0,
-      "เชื่อมต่อไม่ได้ กรุณาตรวจสัญญาณอินเทอร์เน็ตแล้วลองใหม่",
-    );
+    const response = await fetch("/api" + path, {
+        ...options, headers, signal: controller.signal, credentials: "same-origin",
+      });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new ApiError(response.status, typeof body.detail === "string"
+        ? body.detail : `ทำรายการไม่สำเร็จ (${response.status}) กรุณาตรวจข้อมูล`);
+    }
+    return await response.json() as T;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(0, controller.signal.aborted
+      ? "หมดเวลารอ กรุณาตรวจสอบสถานะแล้วลองใหม่ ข้อมูลอาจบันทึกสำเร็จแล้ว"
+      : "เชื่อมต่อไม่ได้ กรุณาตรวจสัญญาณอินเทอร์เน็ตแล้วลองใหม่");
+  } finally {
+    clearTimeout(timeout);
+    options.signal?.removeEventListener("abort", abort);
   }
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new ApiError(
-      response.status,
-      typeof body.detail === "string"
-        ? body.detail
-        : `ทำรายการไม่สำเร็จ (${response.status}) กรุณาตรวจข้อมูล`,
-    );
-  }
-  return response.json() as Promise<T>;
 }
 export function message(error: unknown) {
   return error instanceof Error ? error.message : "เกิดข้อผิดพลาด กรุณาลองใหม่";

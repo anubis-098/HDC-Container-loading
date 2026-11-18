@@ -117,7 +117,7 @@ export function DashboardPage() {
           <input
             aria-label={t("ค้นหาเที่ยวรถ")}
             maxLength={100}
-            placeholder="????????? / Order / Store"
+            placeholder="ทะเบียนรถ / Order / Store"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />

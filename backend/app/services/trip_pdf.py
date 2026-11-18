@@ -53,9 +53,9 @@ def render_trip_pdf(output, trip, photos, load_image):
         for line in wrapped(f"Pallet {pallet['number']} | Store {pallet['store_code']} : {pallet['store_name']}",width-80,11):
             appendix.append(('header',line))
         for index,order in enumerate(pallet['orders'],1):
-            for line in wrapped(f'Order {index}: {order}',width-96):
+            for line in wrapped(f'Order No. {index}: {order}',width-96):
                 appendix.append(('order',line))
-        if not pallet['orders']: appendix.append(('order','Order: -'))
+        if not pallet['orders']: appendix.append(('order','Order No.: -'))
         appendix.append(('space',''))
     appendix_pages=[];current=[]
     for item in appendix:
@@ -77,7 +77,7 @@ def render_trip_pdf(output, trip, photos, load_image):
         canvas.setFillColor(HexColor(MUTED));canvas.setFont('Helvetica',9);canvas.drawString(133,height-56,'TRIP PHOTO REPORT  /  CJ LOGISTICS')
         canvas.setFont('Helvetica-Bold',11);canvas.drawRightString(width-28,height-39,f'{len(photos)} PHOTOS')
         canvas.setFont('Helvetica',8);canvas.drawRightString(width-28,height-55,trip['status'])
-        canvas.setFillColor(HexColor('#F2F7FB'));canvas.roundRect(28,height-132,width-56,58,8,fill=1,stroke=0)
+        canvas.setFillColor(HexColor('#F2F7FB'));canvas.roundRect(28,height-151,width-56,77,8,fill=1,stroke=0)
         shipment=' / '.join(item['number'] for item in trip['shipments'])
         stores=' / '.join(f"{item['store_code']} {item['store_name']}" for item in trip['shipments'])
         if new_structure:
@@ -87,21 +87,24 @@ def render_trip_pdf(output, trip, photos, load_image):
         text(shipment if new_structure else f"Shipment: {shipment}",305,height-84,width-345)
         text(f"ผู้บันทึก: {trip['worker_name']}",40,height-108,250)
         text(f"Store: {stores}",305,height-108,width-345)
-        gap=12;cell_w=(width-56-2*gap)/3;cell_h=(height-194-gap)/2;top=height-146
+        orders=list(dict.fromkeys(order for pallet in pallets for order in pallet.get('orders',[])))
+        text('Order No.: '+(' / '.join(orders) or '-'),40,height-132,width-80,size=9)
+        gap=12;cell_w=(width-56-2*gap)/3;cell_h=(height-213-gap)/2;top=height-165
         for position,photo in enumerate(photos[page*6:(page+1)*6]):
             x=28+(position%3)*(cell_w+gap);y=top-(position//3)*(cell_h+gap)-cell_h
             canvas.setStrokeColor(HexColor('#DCE7EF'));canvas.setFillColor(HexColor('#F8FAFC'));canvas.roundRect(x,y,cell_w,cell_h,7,fill=1,stroke=1)
             with Image.open(BytesIO(load_image(photo))) as original:
                 image=original.convert('RGB');image.thumbnail((1200,1200),Image.Resampling.LANCZOS)
                 compressed=BytesIO();image.save(compressed,'JPEG',quality=78,optimize=True)
-                caption_space=52 if new_structure else 36
+                caption_space=64 if new_structure else 36
                 factor=min((cell_w-16)/image.width,(cell_h-caption_space)/image.height)
                 iw,ih=image.width*factor,image.height*factor
                 compressed.seek(0)
-                canvas.drawImage(ImageReader(compressed),x+(cell_w-iw)/2,y+(44 if new_structure else 28)+(cell_h-caption_space-ih)/2,width=iw,height=ih)
+                canvas.drawImage(ImageReader(compressed),x+(cell_w-iw)/2,y+(56 if new_structure else 28)+(cell_h-caption_space-ih)/2,width=iw,height=ih)
             if new_structure:
                 pallet=next((p for p in pallets if p['id']==photo['pallet_id']),None)
-                text(f"Pallet {pallet['number']} | Store {pallet['store_code']}" if pallet else 'Trip overview',x+10,y+34,cell_w-20,size=8)
+                text(f"Pallet {pallet['number']} | Store {pallet['store_code']}" if pallet else 'Trip overview',x+10,y+46,cell_w-20,size=8)
+                text('Order No.: '+(' / '.join(pallet['orders']) if pallet and pallet['orders'] else '-'),x+10,y+32,cell_w-20,size=8)
             canvas.setFillColor(HexColor(BLUE));canvas.setFont('Helvetica-Bold',9);canvas.drawString(x+10,y+11,f'PHOTO {page*6+position+1:03d}')
             canvas.setFillColor(HexColor(MUTED));canvas.setFont('Helvetica',7)
             uploaded=photo['uploaded_at'].astimezone(ZoneInfo('Asia/Bangkok')).strftime('%d/%m/%Y %H:%M')

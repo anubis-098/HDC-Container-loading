@@ -281,7 +281,7 @@ def test_admin_image_download_zip_and_pdf():
     assert image.content[:2]==b'\xff\xd8'
     zipped=client.get(paths[1]);assert zipped.status_code==200
     with ZipFile(BytesIO(zipped.content)) as bundle:
-        assert len(bundle.namelist())==7
+        assert len([name for name in bundle.namelist() if name.endswith('.jpg')])==7
         assert bundle.testzip() is None
     pdf=client.get(paths[2]);assert pdf.status_code==200
     report=PdfReader(BytesIO(pdf.content));assert len(report.pages)==2

@@ -2,7 +2,7 @@ from io import BytesIO
 from uuid import uuid4
 from zipfile import ZipFile
 import json
-from PIL import Image
+from PIL import Image, ImageDraw
 from pypdf import PdfReader
 from test_workflow import isolated_database, worker
 from app.db.connection import connect
@@ -51,7 +51,7 @@ def test_admin_can_cancel_only_open_trips_and_preserve_data():
     assert administrator.post(f'/api/admin/trips/{completed["id"]}/cancel').status_code==409
 
 
-def test_multi_store_pallets_orders_and_both_photo_scopes(tmp_path):
+def test_multi_store_pallets_orders_and_both_photo_scopes(tmp_path, monkeypatch):
     client=worker();trip,body=new_trip(client)
     assert trip['structure_version']==2 and trip['shipments']==[] and trip['pallets']==[]
     assert client.post('/api/trips',json=body).status_code==200
@@ -88,15 +88,33 @@ def test_multi_store_pallets_orders_and_both_photo_scopes(tmp_path):
     with ZipFile(BytesIO(zipped.content)) as archive:
         manifest=json.loads(archive.read('manifest.json'))
         assert len(manifest['pallets'])==2 and manifest['pallets'][0]['orders']==first['orders']
-        assert len([name for name in archive.namelist() if name.endswith('.jpg')])==3
+        photos = [name for name in archive.namelist() if name.endswith('.jpg')]
+        assert len(photos)==5
         assert any(name.startswith('Trip-overview/') for name in archive.namelist())
-        assert any(name.startswith('Pallet-001-') for name in archive.namelist())
+        assert any(name.startswith('Pallet-001/ORDER-A/') for name in photos)
+        assert any(name.startswith('Pallet-001/ORDER-B/') for name in photos)
+        assert any(name.startswith('Pallet-002/ORDER-C/') for name in photos)
+        assert len(photos)==len(set(photos))
+        first_copies = [archive.read(name) for name in photos if name.startswith('Pallet-001/')]
+        assert first_copies[0] == first_copies[1]
+    labels=[]
+    original_text=ImageDraw.ImageDraw.text
+    def capture_text(self,xy,text,*args,**kwargs):
+        labels.append(str(text))
+        return original_text(self,xy,text,*args,**kwargs)
+    monkeypatch.setattr(ImageDraw.ImageDraw,'text',capture_text)
     report=client.get(f'/api/admin/trips/{tid}/report.pdf');assert report.status_code==200,report.text
     assert len(PdfReader(BytesIO(report.content)).pages)==2
+    assert any('Order No.:' in label and 'ORDER-A' in label for label in labels)
+    for order in ['ORDER-A','ORDER-B','ORDER-C']:
+        assert any('Order No.' in label and order in label for label in labels)
     from pathlib import Path
     Path('/tmp/pallet-uat.pdf').write_bytes(report.content)
     selected=client.post('/api/admin/trips/photos.zip',json=[tid]);assert selected.status_code==200
-    with ZipFile(BytesIO(selected.content)) as archive:assert any(name.endswith('manifest.json') for name in archive.namelist())
+    with ZipFile(BytesIO(selected.content)) as archive:
+        assert any(name.endswith('manifest.json') for name in archive.namelist())
+        assert len([name for name in archive.namelist() if name.endswith('.jpg')])==5
+        assert any('/Pallet-001/ORDER-B/' in name for name in archive.namelist())
     with connect() as conn:conn.execute("UPDATE photos SET uploaded_at=now()-interval '31 days' WHERE trip_id=%s",(tid,))
     from app.workers.archive import run
     assert run()==3
