@@ -1,10 +1,12 @@
 from collections import defaultdict, deque
+import logging
 from datetime import datetime, timezone
 from time import monotonic
 from threading import Lock
 from uuid import UUID, uuid4
 from fastapi import Form, APIRouter, Depends, HTTPException, Request, Response, UploadFile, File
 from psycopg.errors import UniqueViolation
+from psycopg import OperationalError
 from app.api.schemas import WorkerInput, LoginInput, TripInput, ShipmentInput, PalletInput, StoreInput, TripPalletInput
 from app.core.security import worker, admin, actor, create_session, password_matches, password_hash, trip_access
 from app.db.connection import connect
@@ -399,6 +401,8 @@ def upload_trip_photo(trip_id: UUID, photo_id: UUID, file: UploadFile = File(...
     data, digest = normalize_image(content)
     with connect() as conn:
         trip_access(conn, trip_id, who, True)
+        if conn.execute('SELECT 1 FROM deleted_photos WHERE id=%s', (photo_id,)).fetchone():
+            raise HTTPException(410, 'ภาพนี้ถูกลบแล้ว กรุณาเลือกรูปใหม่')
         if pallet_id is not None and not conn.execute('SELECT 1 FROM pallets WHERE id=%s AND trip_id=%s', (pallet_id,trip_id)).fetchone():
             raise HTTPException(404, 'Pallet does not belong to this Trip')
         previous = conn.execute('SELECT * FROM photos WHERE id=%s', (photo_id,)).fetchone()
@@ -418,6 +422,31 @@ def upload_trip_photo(trip_id: UUID, photo_id: UUID, file: UploadFile = File(...
         if not previous:
             audit(conn, who, 'photo.upload', photo_id)
     return {'id':photo_id}
+
+
+@router.delete('/trips/{trip_id}/pallets/{pallet_id}/photos/{photo_id}')
+def delete_pallet_photo(trip_id: UUID, pallet_id: UUID, photo_id: UUID, who=Depends(worker)):
+    with connect() as conn:
+        trip_access(conn, trip_id, who, True)
+        if not conn.execute('SELECT 1 FROM pallets WHERE id=%s AND trip_id=%s', (pallet_id,trip_id)).fetchone():
+            raise HTTPException(404, 'ไม่พบ Pallet ในเที่ยวรถนี้')
+        photo = conn.execute('SELECT trip_id,pallet_id FROM photos WHERE id=%s', (photo_id,)).fetchone()
+        if photo:
+            if photo['trip_id'] != trip_id or photo['pallet_id'] != pallet_id:
+                raise HTTPException(404, 'ไม่พบรูปใน Pallet นี้')
+            conn.execute('INSERT INTO deleted_photos(id,trip_id,pallet_id) VALUES(%s,%s,%s)', (photo_id,trip_id,pallet_id))
+            conn.execute('DELETE FROM photos WHERE id=%s', (photo_id,))
+            audit(conn, who, 'photo.delete', photo_id)
+        elif not conn.execute('SELECT 1 FROM deleted_photos WHERE id=%s AND trip_id=%s AND pallet_id=%s', (photo_id,trip_id,pallet_id)).fetchone():
+            raise HTTPException(404, 'ไม่พบรูปใน Pallet นี้')
+        result = detail(conn, trip_id, who)
+    # Commit the business record first so a cross-database failure cannot break a live photo.
+    try:
+        with connect(True) as images:
+            images.execute('DELETE FROM photo_blobs WHERE id=%s', (photo_id,))
+    except OperationalError:
+        logging.warning('Photo metadata deleted; image blob cleanup failed', exc_info=True)
+    return result
 
 @router.post('/admin/stores/import')
 def import_stores(file: UploadFile = File(...), sheet: str = Form(''), who=Depends(admin)):

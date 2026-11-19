@@ -121,6 +121,17 @@
 .pallet-heading {
   margin-bottom: 0;
 }
+.client-surface .pallet-photo-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+  color: #b02f42;
+  border-color: #e7bac2;
+  background: #fff5f6;
+}
 @media (max-width: 480px) {
   .pallet-card-top {
     align-items: flex-start;

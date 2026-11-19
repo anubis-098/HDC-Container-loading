@@ -1,6 +1,6 @@
 import { StorePicker } from "./StorePicker";
 import { useEffect, useRef, useState } from "react";
-import { Plus, Camera } from "lucide-react";
+import { Plus, Camera, Trash2 } from "lucide-react";
 import {
   api,
   message,
@@ -8,6 +8,7 @@ import {
   type Trip,
   type Store,
   type Pallet,
+  type Photo,
 } from "../lib/api";
 import { type PendingPhoto } from "../lib/photoQueue";
 import { PhotoTile } from "./PhotoTile";
@@ -18,20 +19,24 @@ export function TripPallets({
   stores,
   disabled,
   canCapture,
+  canDelete,
   pending,
   onUpdated,
   onCapture,
   onDiscard,
+  onDelete,
   onEditingChange,
 }: {
   trip: Trip;
   stores: Store[];
   disabled: boolean;
   canCapture: boolean;
+  canDelete: boolean;
   pending: PendingPhoto[];
   onUpdated: (trip: Trip) => void;
   onCapture: (files: File[], palletId: string) => void;
   onDiscard: (photo: PendingPhoto) => void;
+  onDelete: (photo: Photo, palletId: string) => void;
   onEditingChange: (editing: boolean) => void;
 }) {
   const [form, setForm] = useState(false),
@@ -284,13 +289,19 @@ export function TripPallets({
             )}
             <div className="capture-grid">
               {pallet.photos.map((photo, i) => (
+                <div key={photo.id}>
                 <PhotoTile
-                  key={photo.id}
                   label={`Pallet ${pallet.number} · ${i + 1}`}
                   photo={photo}
                   disabled
                   onCapture={() => {}}
                 />
+                {!done && <Button type="button" variant="outline" className="pallet-photo-delete"
+                  disabled={disabled || saving || !canDelete} aria-label={`ลบรูปที่ ${i + 1} ของ Pallet ${pallet.number}`}
+                  onClick={() => {
+                    if (window.confirm(`ลบรูปที่ ${i + 1} ของ Pallet ${pallet.number}?`)) onDelete(photo, pallet.id);
+                  }}><Trash2 size={16} aria-hidden="true"/>ลบรูป</Button>}
+                </div>
               ))}
               {queued.map((photo, i) => (
                 <div key={photo.key}>

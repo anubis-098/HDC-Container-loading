@@ -93,10 +93,12 @@ export function LoadingPage() {
         const path = item.photoId
           ? `/trips/${id}/photos/${item.photoId}${item.palletId && !item.side ? "?pallet_id=" + item.palletId : ""}`
           : `/trips/${id}/pallets/${item.palletId}/photos/${item.side}`;
-        await api(path, {
-          method: "PUT",
-          body,
-        });
+        try {
+          await api(path, { method: "PUT", body });
+        } catch (error) {
+          if (!(error instanceof ApiError && error.status === 410)) throw error;
+          // Another session deleted this photo; discard its stale local retry.
+        }
         await acknowledge(item);
         if (mounted.current) setQueue(await allPending());
       }
@@ -484,8 +486,18 @@ export function LoadingPage() {
               stores={stores}
               disabled={disabled}
               canCapture={totalPhotos < MAX_TRIP_PHOTOS}
+              canDelete={online}
               pending={pending}
               onUpdated={setTrip}
+              onDelete={(photo, palletId) => void action(async () => {
+                const next = await api<Trip>(`/trips/${trip.id}/pallets/${palletId}/photos/${photo.id}`, {method:"DELETE"});
+                setTrip(next);
+                for (const item of await allPending()) {
+                  if (item.tripId === trip.id && (item.photoId === photo.id ||
+                    (!!photo.side && item.palletId === palletId && item.side === photo.side))) await acknowledge(item);
+                }
+                setQueue(await allPending());
+              })}
               onCapture={(files, palletId) => void takePhotos(files, palletId)}
               onDiscard={(item) => {
                 if (window.confirm("ลบภาพนี้ออกจากคิวรอส่งในเครื่อง?"))
