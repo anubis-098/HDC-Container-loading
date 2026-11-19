@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../lib/i18n";
 import { StorePicker } from "./StorePicker";
 import { useEffect, useRef, useState } from "react";
 import { Plus, Camera, Trash2 } from "lucide-react";
@@ -39,6 +40,7 @@ export function TripPallets({
   onDelete: (photo: Photo, palletId: string) => void;
   onEditingChange: (editing: boolean) => void;
 }) {
+  useLanguage();
   const [form, setForm] = useState(false),
     [editing, setEditing] = useState<Pallet | null>(null),
     [store, setStore] = useState(""),
@@ -54,7 +56,7 @@ export function TripPallets({
   useEffect(() => {
     if (form) {
       editor.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      editor.current?.querySelector("select")?.focus({ preventScroll: true });
+      editor.current?.querySelector<HTMLButtonElement>(".store-picker-trigger")?.focus({ preventScroll: true });
     }
   }, [form, editing]);
   useEffect(() => {
@@ -102,9 +104,9 @@ export function TripPallets({
         store_code: store,
         orders: orders.map((v) => v.trim()).filter(Boolean),
       };
-      if (!body.orders.length) throw new Error("กรุณากรอกเลข Order อย่างน้อย 1 เลข");
+      if (!body.orders.length) throw new Error(t("กรุณากรอกเลข Order อย่างน้อย 1 เลข"));
       if (new Set(body.orders).size !== body.orders.length)
-        throw new Error("เลข Order ซ้ำใน Pallet นี้");
+        throw new Error(t("เลข Order ซ้ำใน Pallet นี้"));
       const result = await api<Trip>(
         `/trips/${trip.id}/pallets${editing ? "/" + editing.id : ""}`,
         { method: editing ? "PUT" : "POST", body: JSON.stringify(body) },
@@ -127,7 +129,7 @@ export function TripPallets({
         {!done && !form && (
           <Button disabled={disabled} onClick={() => open()}>
             <Plus size={18} />
-            เพิ่ม Pallet
+            {t("เพิ่ม Pallet")}
           </Button>
         )}
       </div>
@@ -137,23 +139,23 @@ export function TripPallets({
           className="panel client-form pallet-editor"
           onSubmit={(e) => void save(e)}
         >
-          <h2>{editing ? `แก้ไข Pallet ${editing.number}` : "เพิ่ม Pallet"}</h2>
+          <h2>{editing ? t("แก้ไข Pallet {0}", editing.number) : t("เพิ่ม Pallet")}</h2>
           <StorePicker stores={stores} value={store} onChange={setStore} disabled={disabled || saving}
             existing={editing ? {code: editing.store_code, name: editing.store_name} : undefined} />
           <div className="pallet-orders-label">
-            เลข Order <small>บังคับอย่างน้อย 1 เลข · เพิ่มได้หลายเลข</small>
+            {t("เลข Order")} <small>{t("บังคับอย่างน้อย 1 เลข · เพิ่มได้หลายเลข")}</small>
           </div>
           {orders.map((order, index) => (
             <div className="order-input-row" key={index}>
               <input
                 ref={(element) => { orderInputs.current[index] = element; }}
-                aria-label={`เลข Order ${index + 1}`}
+                aria-label={t("เลข Order {0}", index + 1)}
                 required={index === 0}
                 className={index === 0 ? "required-entry" : undefined}
                 maxLength={80}
                 value={order}
                 disabled={disabled || saving}
-                placeholder="สแกนหรือกรอกเลข Order"
+                placeholder={t("สแกนหรือกรอกเลข Order")}
                 onChange={(e) =>
                   setOrders((values) =>
                     values.map((v, i) => (i === index ? e.target.value : v)),
@@ -170,7 +172,7 @@ export function TripPallets({
                 <button
                   type="button"
                   className="order-remove"
-                  aria-label={`ลบเลข Order ${index + 1}`}
+                  aria-label={t("ลบเลข Order {0}", index + 1)}
                   disabled={disabled || saving}
                   onClick={() =>
                     setOrders((values) => values.filter((_, i) => i !== index))
@@ -188,7 +190,7 @@ export function TripPallets({
             onClick={addOrder}
           >
             <Plus size={16} />
-            เพิ่มเลข Order
+            {t("เพิ่มเลข Order")}
           </Button>
           {error && (
             <p className="error-box" role="alert">
@@ -202,17 +204,17 @@ export function TripPallets({
               disabled={saving}
               onClick={() => setForm(false)}
             >
-              ยกเลิก
+              {t("ยกเลิก")}
             </Button>
             <Button disabled={disabled || saving || !store}>
-              {saving ? "กำลังบันทึก…" : "บันทึก Pallet"}
+              {saving ? t("กำลังบันทึก…") : t("บันทึก Pallet")}
             </Button>
           </div>
         </form>
       )}
       {!trip.pallets.length && !form && (
         <div className="panel empty-state">
-          ยังไม่มี Pallet · กด “เพิ่ม Pallet” เพื่อเลือก Store
+          {t("ยังไม่มี Pallet · กด “เพิ่ม Pallet” เพื่อเลือก Store")}
         </div>
       )}
       {trip.pallets.map((pallet) => {
@@ -236,7 +238,7 @@ export function TripPallets({
                   disabled={disabled || saving}
                   onClick={() => open(pallet)}
                 >
-                  แก้ไข
+                  {t("แก้ไข")}
                 </Button>
               )}
             </div>
@@ -244,24 +246,24 @@ export function TripPallets({
               {pallet.orders.length ? (
                 pallet.orders.map((order) => <span key={order}>{order}</span>)
               ) : (
-                <small>{done ? "ไม่ระบุเลข Order" : "ยังไม่มีเลข Order · กดแก้ไขเพื่อระบุ"}</small>
+                <small>{done ? t("ไม่ระบุเลข Order") : t("ยังไม่มีเลข Order · กดแก้ไขเพื่อระบุ")}</small>
               )}
             </div>
             <div className="pallet-photo-title">
-              <b>ภาพ Pallet · {pallet.photos.length} ภาพ</b>
-              {queued.length > 0 && <small>รอส่ง {queued.length}</small>}
+              <b>{t("ภาพ Pallet · {0} ภาพ", pallet.photos.length)}</b>
+              {queued.length > 0 && <small>{t("รอส่ง {0}", queued.length)}</small>}
             </div>
             {!done && (
               <div className="trip-capture-actions">
                 <label className="camera-button">
                   <Camera size={20} />
-                  ถ่ายภาพ
+                  {t("ถ่ายภาพ")}
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     capture="environment"
                     disabled={disabled || !canCapture}
-                    aria-label={`ถ่ายภาพ Pallet ${pallet.number}`}
+                    aria-label={t("ถ่ายภาพ Pallet {0}", pallet.number)}
                     onChange={(e) => {
                       const files = Array.from(e.target.files || []);
                       e.target.value = "";
@@ -271,13 +273,13 @@ export function TripPallets({
                 </label>
                 <label className="camera-button gallery-button">
                   <Plus size={18} />
-                  เลือกภาพ
+                  {t("เลือกภาพ")}
                   <input
                     type="file"
                     multiple
                     accept="image/jpeg,image/png,image/webp"
                     disabled={disabled || !canCapture}
-                    aria-label={`เลือกภาพ Pallet ${pallet.number}`}
+                    aria-label={t("เลือกภาพ Pallet {0}", pallet.number)}
                     onChange={(e) => {
                       const files = Array.from(e.target.files || []);
                       e.target.value = "";
@@ -297,16 +299,16 @@ export function TripPallets({
                   onCapture={() => {}}
                 />
                 {!done && <Button type="button" variant="outline" className="pallet-photo-delete"
-                  disabled={disabled || saving || !canDelete} aria-label={`ลบรูปที่ ${i + 1} ของ Pallet ${pallet.number}`}
+                  disabled={disabled || saving || !canDelete} aria-label={t("ลบรูปที่ {0} ของ Pallet {1}", i + 1, pallet.number)}
                   onClick={() => {
-                    if (window.confirm(`ลบรูปที่ ${i + 1} ของ Pallet ${pallet.number}?`)) onDelete(photo, pallet.id);
-                  }}><Trash2 size={16} aria-hidden="true"/>ลบรูป</Button>}
+                    if (window.confirm(t("ลบรูปที่ {0} ของ Pallet {1}?", i + 1, pallet.number))) onDelete(photo, pallet.id);
+                  }}><Trash2 size={16} aria-hidden="true"/>{t("ลบรูป")}</Button>}
                 </div>
               ))}
               {queued.map((photo, i) => (
                 <div key={photo.key}>
                   <PhotoTile
-                    label={`รอส่ง ${i + 1}`}
+                    label={t("รอส่ง {0}", i + 1)}
                     pending={photo}
                     disabled
                     onCapture={() => {}}
@@ -316,7 +318,7 @@ export function TripPallets({
                     disabled={disabled}
                     onClick={() => onDiscard(photo)}
                   >
-                    ลบภาพรอส่ง
+                    {t("ลบภาพรอส่ง")}
                   </Button>
                 </div>
               ))}

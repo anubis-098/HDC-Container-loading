@@ -17,7 +17,7 @@ class TripInput(Input):
     id: UUID
     truck_id: str = Field(min_length=1, max_length=40)
     truck_province: str | None = Field(default=None, min_length=2, max_length=60)
-    truck_type: Literal['4 ล้อ','6 ล้อ','10 ล้อ','12 ล้อ','รถเทรลเลอร์']
+    truck_type: Literal['4 ล้อ','6 ล้อ','10 ล้อ','Dock Tailer','18 ล้อ','รถเทรลเลอร์']
     shipment_number: str | None = Field(default=None, min_length=1, max_length=80)
     store_code: str | None = Field(default=None, min_length=1, max_length=40)
 

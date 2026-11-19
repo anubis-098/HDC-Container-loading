@@ -8,6 +8,7 @@ const source=ts.transpileModule(fs.readFileSync(path.join(__dirname,'../src/comp
 function render(status='OPEN',online=true){
  const exported={};
  new Function('require','exports',source)(name=>{
+  if(name==='../lib/i18n')return {useLanguage(){},t:(s,...values)=>s.replace(/\{(\d+)\}/g,(_,i)=>String(values[i]))};
   if(name==='./StorePicker')return {StorePicker:()=>null};
   if(name==='../lib/api')return {uid:()=> 'request-id'};
   if(name==='./PhotoTile')return {PhotoTile:props=>React.createElement('div',null,props.label)};

@@ -110,7 +110,8 @@ export const truckTypes = [
   "4 ล้อ",
   "6 ล้อ",
   "10 ล้อ",
-  "12 ล้อ",
+  "Dock Tailer",
+  "18 ล้อ",
   "รถเทรลเลอร์",
 ] as const;
 export const MAX_TRIP_PHOTOS = 120;
