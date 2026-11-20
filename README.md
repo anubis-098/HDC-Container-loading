@@ -20,7 +20,7 @@ docker compose ps
 ```
 
 API จะรัน SQL migrations แบบมี version ก่อนเปิดบริการ ไม่ลบข้อมูลเดิม
-เปิด `http://localhost:8080` สำหรับ Dev
+เปิด `https://10.84.185.1:8080` หลังเตรียม Certificate และตั้งค่า `.env` ตามหัวข้อ HTTPS deployment
 
 3. สร้าง Administrator ครั้งแรก (กรอกบัญชีและรหัสผ่านอย่างน้อย 12 ตัว):
 
@@ -120,3 +120,19 @@ docker compose logs --tail 100 api frontend archive-worker
 - Migration `004_truck_province.sql` สร้างตาราง `provinces` ในฐานข้อมูลหลัก พร้อม 77 รายการ (รวมกรุงเทพมหานครและบึงกาฬ) และ `trips.truck_province` เป็น foreign key
 - Trip เก่าคงค่า NULL; API ยอมรับการไม่ส่งจังหวัดเพื่อรองรับ Client รุ่นก่อน แต่ฟอร์มใหม่บังคับเลือกจังหวัดที่ถูกต้อง
 - อัปเดตด้วย `docker compose up -d --build` เพื่อให้ API เรียก migration อัตโนมัติ
+
+
+## HTTPS deployment
+
+The frontend now serves HTTPS on its existing host port. Before starting Compose,
+place `hdc-server.crt` and `hdc-server.key` in `D:/HDC-Certificates` on the Docker
+host. Set `HDC_TLS_DIRECTORY` in `.env` only if using a different directory.
+The certificate must include the server IP in its IP Subject Alternative Name,
+and client devices must trust its issuing CA.
+
+Set `COOKIE_SECURE=true` in `.env`, then rebuild using the existing Data Center
+`scripts/Start-Integration.ps1` workflow to retain shared accounts and Store sync.
+Do not recreate database volumes. Port 80 stays internal for health checks;
+the published frontend port maps to HTTPS port 443. Import only the root CA's
+public `.cer` certificate into the SOTI Certificates profile, then assign it to
+the devices. Private keys stay on the server.
